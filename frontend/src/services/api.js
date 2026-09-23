@@ -49,11 +49,15 @@ export function uploadValveDatasheet(id, file) {
 }
 
 export function startOutput() {
-  return api.post('/ctrlx/start')
+  return api.post('/ctrlx/start') // Route kept same for minimal disruption
 }
 
 export function stopOutput() {
   return api.post('/ctrlx/stop')
+}
+
+export function fetchOpcData() {
+  return api.get('/opcua/data')
 }
 
 export default api
