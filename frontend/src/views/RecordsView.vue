@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
-import api, { startOutput, stopOutput } from "../services/api";
+import api, { startOutput, stopOutput, fetchOpcData } from "../services/api"; 
 import { useValveStore } from "../stores/valve";
 
 import AutoComplete from "primevue/autocomplete";
@@ -30,6 +30,9 @@ ChartJS.register(
   Filler,
 );
 
+// FIX: Move STEPS to the top so arrays can reference it
+const STEPS = 40;
+
 const route = useRoute();
 const valveStore = useValveStore();
 const toast = useToast();
@@ -46,6 +49,18 @@ const isRecording = ref(false);
 const isStarting = ref(false);
 const isStopping = ref(false);
 const imageViewerVisible = ref(false);
+
+// LIVE DATA STATE
+let liveDataInterval = null;
+const livePressureHistory = ref(Array(STEPS).fill(0));
+const liveFlowHistory = ref(Array(STEPS).fill(0));
+
+const feedback = ref({
+  position: 0,
+  current: 0,
+  temperature: 0, 
+  status: "Waiting for connection...",
+});
 
 async function loadValves() {
   try {
@@ -239,118 +254,69 @@ function handleImageViewerKeydown(event) {
   }
 }
 
-const STEPS = 40;
+// FETCH LIVE OPC UA DATA
+async function pollLiveData() {
+  if (!valve.value || controlStatus.value !== "active") return;
 
-function generateSeries(target) {
-  const targetValue = Number(target) || 0;
-  const points = [];
-  let currentValue = targetValue * 0.85;
+  try {
+    const response = await fetchOpcData();
+    const data = response.data;
 
-  for (let index = 0; index < STEPS; index++) {
-    const noise = (Math.random() - 0.5) * targetValue * 0.05;
-    const reversion = (targetValue - currentValue) * 0.2;
-    currentValue = currentValue + noise + reversion;
+    // Update feedback panel (assuming feedback node returns position, map others if available)
+    feedback.value.position = data.feedback !== null ? Number(data.feedback).toFixed(1) : 0;
+    feedback.value.current = data.command !== null ? (Number(data.command) * 0.05).toFixed(2) : 0; // Example mapping
+    feedback.value.status = data.feedback !== null ? "Connected" : "No Data";
 
-    points.push({
-      x: index,
-      y: Math.round(currentValue * 100) / 100,
-    });
+    // Shift arrays and push new data for charts
+    livePressureHistory.value.shift();
+    livePressureHistory.value.push(data.pressure !== null ? Number(data.pressure) : 0);
+
+    liveFlowHistory.value.shift();
+    liveFlowHistory.value.push(data.flow !== null ? Number(data.flow) : 0);
+
+  } catch (error) {
+    feedback.value.status = "Connection Error";
   }
-
-  if (points.length > 0) {
-    points[points.length - 1].y = targetValue;
-  }
-
-  return points;
 }
 
+// UPDATE CHARTS TO USE LIVE ARRAYS
 const pressureChartData = computed(() => ({
+  labels: Array(STEPS).fill(''),
   datasets: [
     {
-      label: "Pressure",
-      data: generateSeries(valve.value?.max_pressure),
+      label: "Live Pressure",
+      data: livePressureHistory.value,
       borderColor: "#3b82f6",
       backgroundColor: "rgba(59, 130, 246, 0.12)",
       fill: true,
       tension: 0.35,
       pointRadius: 0,
-      pointHoverRadius: 4,
       borderWidth: 2,
     },
   ],
 }));
 
 const flowChartData = computed(() => ({
+  labels: Array(STEPS).fill(''),
   datasets: [
     {
-      label: "Rated Flow",
-      data: generateSeries(valve.value?.rated_flow),
+      label: "Live Flow",
+      data: liveFlowHistory.value,
       borderColor: "#22c55e",
       backgroundColor: "rgba(34, 197, 94, 0.08)",
-      fill: false,
+      fill: true,
       tension: 0.35,
       pointRadius: 0,
-      pointHoverRadius: 4,
       borderWidth: 2,
-    },
-    {
-      label: "Maximum Flow",
-      data: generateSeries(valve.value?.max_flow),
-      borderColor: "#3b82f6",
-      backgroundColor: "rgba(59, 130, 246, 0.08)",
-      fill: false,
-      tension: 0.35,
-      pointRadius: 0,
-      pointHoverRadius: 4,
-      borderWidth: 2,
-    },
+    }
   ],
 }));
 
-function makeProgressiveAnimation(totalDuration = 1200) {
-  const delayBetweenPoints = totalDuration / STEPS;
-
-  const previousY = (context) => {
-    if (context.index === 0) {
-      return context.chart.scales.y.getPixelForValue(0);
-    }
-
-    const previousPoint = context.chart.getDatasetMeta(context.datasetIndex)
-      .data[context.index - 1];
-
-    return previousPoint?.getProps(["y"], true).y;
-  };
-
-  return {
-    x: {
-      type: "number",
-      easing: "easeOutQuad",
-      duration: delayBetweenPoints,
-      from: Number.NaN,
-      delay(context) {
-        if (context.type !== "data" || context.xStarted) return 0;
-        context.xStarted = true;
-        return context.index * delayBetweenPoints;
-      },
-    },
-    y: {
-      type: "number",
-      easing: "easeOutQuad",
-      duration: delayBetweenPoints,
-      from: previousY,
-      delay(context) {
-        if (context.type !== "data" || context.yStarted) return 0;
-        context.yStarted = true;
-        return context.index * delayBetweenPoints;
-      },
-    },
-  };
-}
 
 const chartOptions = {
   responsive: true,
   maintainAspectRatio: false,
-  animation: makeProgressiveAnimation(),
+  animation: { duration: 0 },
   interaction: {
     intersect: false,
     mode: "index",
@@ -388,26 +354,23 @@ const chartOptions = {
   },
 };
 
-const feedback = ref({
-  position: 65,
-  current: 1.25,
-  temperature: 42,
-  status: "Normal",
-});
+
 
 onMounted(async () => {
   await loadValves();
-
   if (route.params.id) {
     await fetchValveById(route.params.id);
   }
-
   window.addEventListener("keydown", handleImageViewerKeydown);
+  
+  // Start polling every 1 second
+  liveDataInterval = setInterval(pollLiveData, 1000); 
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", handleImageViewerKeydown);
   document.body.style.overflow = "";
+  if (liveDataInterval) clearInterval(liveDataInterval);
 });
 
 watch(

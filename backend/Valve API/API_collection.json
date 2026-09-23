@@ -1,0 +1,274 @@
+{
+  "info": {
+    "name": "Valve API",
+    "description": "Converted from Bruno Collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "GET /ping",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/ping",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["ping"]
+        }
+      }
+    },
+    {
+      "name": "POST /login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/login",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["login"]
+        }
+      }
+    },
+    {
+      "name": "GET /valves",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/valves",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["valves"]
+        }
+      }
+    },
+    {
+      "name": "POST /valves",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"manufacturer\": \"Bosch Rexroth\",\n  \"part_number\": \"RE 29010\",\n  \"component_series\": \"5X\",\n  \"valve_type\": \"5WRLE\",\n  \"size_ng\": 16,\n  \"weight\": 18,\n  \"rated_flow\": 210,\n  \"max_flow\": 320,\n  \"command_value\": 24,\n  \"command_type\": \"volt\",\n  \"max_pressure\": 420\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/valves",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["valves"]
+        }
+      }
+    },
+    {
+      "name": "GET /valves/:id",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/valves/2",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["valves", "2"]
+        }
+      }
+    },
+    {
+      "name": "PUT /valves/:id",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"manufacturer\": \"Bosch Rexroth\",\n  \"part_number\": \"RE 29124\",\n  \"component_series\": \"3X\",\n  \"valve_type\": \"4WRLE\",\n  \"size_ng\": 16,\n  \"weight\": 12,\n  \"rated_flow\": 200,\n  \"max_flow\": 800.5,\n  \"supply_voltage\": 24,\n  \"max_pressure\": 350  \n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/valves/1",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["valves", "1"]
+        }
+      }
+    },
+    {
+      "name": "DELETE /valves/:id",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/valves/2",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["valves", "2"]
+        }
+      }
+    },
+    {
+      "name": "POST /valves/:id/image",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "image",
+              "type": "file",
+              "src": []
+            }
+          ]
+        },
+        "url": {
+          "raw": "http://localhost:8080/valves/1/image",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["valves", "1", "image"]
+        }
+      }
+    },
+    {
+      "name": "POST /valves/:id/datasheet",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "datasheet",
+              "type": "file",
+              "src": []
+            }
+          ]
+        },
+        "url": {
+          "raw": "http://localhost:8080/valves/1/datasheet",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["valves", "1", "datasheet"]
+        }
+      }
+    },
+    {
+      "name": "GET /settings",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/settings",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["settings"]
+        }
+      }
+    },
+    {
+      "name": "PUT /settings",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"modbus_server_address\": \"127.0.0.1:502\",\n  \"ctrlx_host\": \"127.0.0.1:8443\",\n  \"ctrlx_username\": \"boschrexroth\",\n  \"ctrlx_password\": \"boschrexroth\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/settings",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["settings"]
+        }
+      }
+    },
+    {
+      "name": "GET /token (ctrlX State)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{ctrlx_token}}"
+          }
+        ],
+        "url": {
+          "raw": "https://127.0.0.1:8443/automation/api/v2/nodes/framework/state",
+          "protocol": "https",
+          "host": ["127", "0", "0", "1"],
+          "port": "8443",
+          "path": ["automation", "api", "v2", "nodes", "framework", "state"]
+        }
+      }
+    }
+  ]
+}

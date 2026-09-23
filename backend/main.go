@@ -26,7 +26,7 @@ func main() {
 
 	db := database.ConnectDB()
 	database.SeedUsers(db)
-	
+
 	sqlDB, err := db.DB()
 	if err != nil {
 		log.Fatal("gagal mengambil koneksi sql:", err)
@@ -38,7 +38,6 @@ func main() {
 	os.MkdirAll("./datasheets", os.ModePerm)
 
 	router := gin.Default()
-
 
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:5173"},
@@ -65,20 +64,13 @@ func main() {
 	router.POST("/valves/:id/datasheet", middleware.AuthRequired(), middleware.AdminOnly(), controllers.UploadValveDatasheet(db))
 
 	router.GET("/settings", middleware.AuthRequired(), middleware.AdminOnly(), controllers.GetSettings(db))
-    router.PUT("/settings", middleware.AuthRequired(), middleware.AdminOnly(), controllers.UpdateSettings(db))
-    router.POST("/settings/ctrlx/token", middleware.AuthRequired(), middleware.AdminOnly(), controllers.GenerateCtrlxToken(db))
-
-	router.POST(
-				"/ctrlx/start",
-				middleware.AuthRequired(),
-				controllers.StartOutput(db),
-    )
-
-	router.POST(
-				"/ctrlx/stop",
-				middleware.AuthRequired(),
-				controllers.StopOutput(db),
-	)
+	router.PUT("/settings", middleware.AuthRequired(), middleware.AdminOnly(), controllers.UpdateSettings(db))
+	
+	//OPC UA Routes
+	router.GET("/opcua/data", middleware.AuthRequired(), controllers.GetOpcData(db))
+	router.POST("/ctrlx/start", middleware.AuthRequired(), controllers.StartOutput(db))
+	router.GET("/opcua/status", middleware.AuthRequired(), controllers.GetOpcStatus(db))
+	router.POST("/ctrlx/stop", middleware.AuthRequired(), controllers.StopOutput(db))
 
 	router.Run(":" + appPort)
 }
