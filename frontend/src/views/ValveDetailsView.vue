@@ -55,13 +55,15 @@ function openDatasheet() {
 const imageUrl = computed(() => {
   if (!valve.value?.image_path) return null
   if (valve.value.image_path.startsWith('http')) return valve.value.image_path
-  return `http://localhost:8080${valve.value.image_path}`
+  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+  return `${baseUrl}${valve.value.image_path}`
 })
 
 const datasheetUrl = computed(() => {
   if (!valve.value?.datasheet_path) return null
   if (valve.value.datasheet_path.startsWith('http')) return valve.value.datasheet_path
-  return `http://localhost:8080${valve.value.datasheet_path}`
+  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+  return `${baseUrl}${valve.value.datasheet_path}`
 })
 
 const feedback = {

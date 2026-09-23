@@ -1,20 +1,14 @@
 <script setup>
-import {
-  computed,
-  onBeforeUnmount,
-  onMounted,
-  ref,
-  watch
-} from 'vue'
-import { useRoute } from 'vue-router'
-import api, { startOutput, stopOutput } from '../services/api'
-import { useValveStore } from '../stores/valve'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRoute } from "vue-router";
+import api, { startOutput, stopOutput } from "../services/api";
+import { useValveStore } from "../stores/valve";
 
-import AutoComplete from 'primevue/autocomplete'
-import Button from 'primevue/button'
-import { useToast } from 'primevue/usetoast'
+import AutoComplete from "primevue/autocomplete";
+import Button from "primevue/button";
+import { useToast } from "primevue/usetoast";
 
-import { Line } from 'vue-chartjs'
+import { Line } from "vue-chartjs";
 import {
   Chart as ChartJS,
   Title,
@@ -23,8 +17,8 @@ import {
   LineElement,
   PointElement,
   LinearScale,
-  Filler
-} from 'chart.js'
+  Filler,
+} from "chart.js";
 
 ChartJS.register(
   Title,
@@ -33,321 +27,324 @@ ChartJS.register(
   LineElement,
   PointElement,
   LinearScale,
-  Filler
-)
+  Filler,
+);
 
-const route = useRoute()
-const valveStore = useValveStore()
-const toast = useToast()
+const route = useRoute();
+const valveStore = useValveStore();
+const toast = useToast();
 
-const valve = computed(() => valveStore.selectedValve)
+const valve = computed(() => valveStore.selectedValve);
 
-const allValves = ref([])
-const query = ref('')
-const suggestions = ref([])
-const pendingValve = ref(null)
+const allValves = ref([]);
+const query = ref("");
+const suggestions = ref([]);
+const pendingValve = ref(null);
 
-const controlStatus = ref('stopped')
-const isRecording = ref(false)
-const isStarting = ref(false)
-const isStopping = ref(false)
-const imageViewerVisible = ref(false)
+const controlStatus = ref("stopped");
+const isRecording = ref(false);
+const isStarting = ref(false);
+const isStopping = ref(false);
+const imageViewerVisible = ref(false);
 
 async function loadValves() {
   try {
-    const response = await api.get('/valves')
-    allValves.value = Array.isArray(response.data) ? response.data : []
+    const response = await api.get("/valves");
+    allValves.value = Array.isArray(response.data) ? response.data : [];
   } catch (error) {
-    console.error('Gagal mengambil daftar valve:', error)
+    console.error("Gagal mengambil daftar valve:", error);
     toast.add({
-      severity: 'error',
-      summary: 'Load Failed',
-      detail: 'Unable to load the valve list.',
-      life: 3000
-    })
+      severity: "error",
+      summary: "Load Failed",
+      detail: "Unable to load the valve list.",
+      life: 3000,
+    });
   }
 }
 
 async function fetchValveById(id) {
-  if (!id) return
+  if (!id) return;
 
   try {
-    const response = await api.get(`/valves/${id}`)
-    valveStore.selectValve(response.data)
+    const response = await api.get(`/valves/${id}`);
+    valveStore.selectValve(response.data);
   } catch (error) {
-    console.error('Gagal mengambil detail valve:', error)
+    console.error("Gagal mengambil detail valve:", error);
     toast.add({
-      severity: 'error',
-      summary: 'Load Failed',
-      detail: 'Unable to load the selected valve.',
-      life: 3000
-    })
+      severity: "error",
+      summary: "Load Failed",
+      detail: "Unable to load the selected valve.",
+      life: 3000,
+    });
   }
 }
 
 function search(event) {
-  const keyword = String(event.query || '').trim().toLowerCase()
+  const keyword = String(event.query || "")
+    .trim()
+    .toLowerCase();
 
   if (!keyword) {
-    suggestions.value = allValves.value
-    return
+    suggestions.value = allValves.value;
+    return;
   }
 
   suggestions.value = allValves.value.filter((item) => {
-    const partNumber = item.part_number?.toLowerCase() || ''
-    const manufacturer = item.manufacturer?.toLowerCase() || ''
-    const valveType = item.valve_type?.toLowerCase() || ''
-    const componentSeries = item.component_series?.toLowerCase() || ''
+    const partNumber = item.part_number?.toLowerCase() || "";
+    const manufacturer = item.manufacturer?.toLowerCase() || "";
+    const valveType = item.valve_type?.toLowerCase() || "";
+    const componentSeries = item.component_series?.toLowerCase() || "";
 
     return (
       partNumber.includes(keyword) ||
       manufacturer.includes(keyword) ||
       valveType.includes(keyword) ||
       componentSeries.includes(keyword)
-    )
-  })
+    );
+  });
 }
 
 function onSelect(event) {
-  pendingValve.value = event.value
+  pendingValve.value = event.value;
 }
 
 function confirmShow() {
-  if (!pendingValve.value) return
+  if (!pendingValve.value) return;
 
-  valveStore.selectValve(pendingValve.value)
+  valveStore.selectValve(pendingValve.value);
 
   toast.add({
-    severity: 'info',
-    summary: 'Valve Selected',
+    severity: "info",
+    summary: "Valve Selected",
     detail: `${pendingValve.value.part_number} is ready for testing.`,
-    life: 2500
-  })
+    life: 2500,
+  });
 }
 
 async function startValve() {
-  if (!valve.value || isStarting.value) return
+  if (!valve.value || isStarting.value) return;
 
-  isStarting.value = true
+  isStarting.value = true;
 
   try {
-    await startOutput()
-    controlStatus.value = 'active'
+    await startOutput();
+    controlStatus.value = "active";
     toast.add({
-      severity: 'success',
-      summary: 'START',
-      detail: 'Output ON',
-      life: 3000
-    })
+      severity: "success",
+      summary: "START",
+      detail: "Output ON",
+      life: 3000,
+    });
   } catch (error) {
     toast.add({
-      severity: 'error',
-      summary: 'START FAILED',
-      detail: error.response?.data?.error || 'Unable to activate the output.',
-      life: 4000
-    })
+      severity: "error",
+      summary: "START FAILED",
+      detail: error.response?.data?.error || "Unable to activate the output.",
+      life: 4000,
+    });
   } finally {
-    isStarting.value = false
+    isStarting.value = false;
   }
 }
 
 async function stopValve() {
-  if (!valve.value || isStopping.value) return
+  if (!valve.value || isStopping.value) return;
 
-  isStopping.value = true
+  isStopping.value = true;
 
   try {
-    await stopOutput()
-    controlStatus.value = 'stopped'
-    isRecording.value = false
+    await stopOutput();
+    controlStatus.value = "stopped";
+    isRecording.value = false;
 
     toast.add({
-      severity: 'warn',
-      summary: 'STOP',
-      detail: 'Output OFF',
-      life: 3000
-    })
+      severity: "warn",
+      summary: "STOP",
+      detail: "Output OFF",
+      life: 3000,
+    });
   } catch (error) {
     toast.add({
-      severity: 'error',
-      summary: 'STOP FAILED',
-      detail: error.response?.data?.error || 'Unable to stop the output.',
-      life: 4000
-    })
+      severity: "error",
+      summary: "STOP FAILED",
+      detail: error.response?.data?.error || "Unable to stop the output.",
+      life: 4000,
+    });
   } finally {
-    isStopping.value = false
+    isStopping.value = false;
   }
 }
 
 function toggleRecord() {
-  if (!valve.value) return
+  if (!valve.value) return;
 
-  isRecording.value = !isRecording.value
+  isRecording.value = !isRecording.value;
 
   toast.add({
-    severity: isRecording.value ? 'info' : 'warn',
-    summary: isRecording.value ? 'RECORDING STARTED' : 'RECORDING STOPPED',
+    severity: isRecording.value ? "info" : "warn",
+    summary: isRecording.value ? "RECORDING STARTED" : "RECORDING STOPPED",
     detail: isRecording.value
-      ? 'Test data recording has started. This function is currently a placeholder.'
-      : 'Test data recording has stopped.',
-    life: 3000
-  })
+      ? "Test data recording has started. This function is currently a placeholder."
+      : "Test data recording has stopped.",
+    life: 3000,
+  });
 }
 
 function sendCommand() {
-  if (!valve.value) return
+  if (!valve.value) return;
 
   toast.add({
-    severity: 'success',
-    summary: 'COMMAND',
+    severity: "success",
+    summary: "COMMAND",
     detail:
-      `Command ${valve.value.command_type || '-'}: ` +
-      `${valve.value.command_value ?? '-'} is currently a placeholder.`,
-    life: 3500
-  })
+      `Command ${valve.value.command_type || "-"}: ` +
+      `${valve.value.command_value ?? "-"} is currently a placeholder.`,
+    life: 3500,
+  });
 }
 
 const imageUrl = computed(() => {
   if (!valve.value?.image_path) return null
   if (valve.value.image_path.startsWith('http')) return valve.value.image_path
-  return `http://localhost:8080${valve.value.image_path}`
+  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+  return `${baseUrl}${valve.value.image_path}`
 })
 
 const datasheetUrl = computed(() => {
   if (!valve.value?.datasheet_path) return null
   if (valve.value.datasheet_path.startsWith('http')) return valve.value.datasheet_path
-  return `http://localhost:8080${valve.value.datasheet_path}`
+  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+  return `${baseUrl}${valve.value.datasheet_path}`
 })
 
 function openDatasheet() {
-  if (!datasheetUrl.value) return
-  window.open(datasheetUrl.value, '_blank', 'noopener,noreferrer')
+  if (!datasheetUrl.value) return;
+  window.open(datasheetUrl.value, "_blank", "noopener,noreferrer");
 }
 
 function openImageViewer() {
-  if (!imageUrl.value) return
-  imageViewerVisible.value = true
-  document.body.style.overflow = 'hidden'
+  if (!imageUrl.value) return;
+  imageViewerVisible.value = true;
+  document.body.style.overflow = "hidden";
 }
 
 function closeImageViewer() {
-  imageViewerVisible.value = false
-  document.body.style.overflow = ''
+  imageViewerVisible.value = false;
+  document.body.style.overflow = "";
 }
 
 function handleImageViewerKeydown(event) {
-  if (event.key === 'Escape' && imageViewerVisible.value) {
-    closeImageViewer()
+  if (event.key === "Escape" && imageViewerVisible.value) {
+    closeImageViewer();
   }
 }
 
-const STEPS = 40
+const STEPS = 40;
 
 function generateSeries(target) {
-  const targetValue = Number(target) || 0
-  const points = []
-  let currentValue = targetValue * 0.85
+  const targetValue = Number(target) || 0;
+  const points = [];
+  let currentValue = targetValue * 0.85;
 
   for (let index = 0; index < STEPS; index++) {
-    const noise = (Math.random() - 0.5) * targetValue * 0.05
-    const reversion = (targetValue - currentValue) * 0.2
-    currentValue = currentValue + noise + reversion
+    const noise = (Math.random() - 0.5) * targetValue * 0.05;
+    const reversion = (targetValue - currentValue) * 0.2;
+    currentValue = currentValue + noise + reversion;
 
     points.push({
       x: index,
-      y: Math.round(currentValue * 100) / 100
-    })
+      y: Math.round(currentValue * 100) / 100,
+    });
   }
 
   if (points.length > 0) {
-    points[points.length - 1].y = targetValue
+    points[points.length - 1].y = targetValue;
   }
 
-  return points
+  return points;
 }
 
 const pressureChartData = computed(() => ({
   datasets: [
     {
-      label: 'Pressure',
+      label: "Pressure",
       data: generateSeries(valve.value?.max_pressure),
-      borderColor: '#3b82f6',
-      backgroundColor: 'rgba(59, 130, 246, 0.12)',
+      borderColor: "#3b82f6",
+      backgroundColor: "rgba(59, 130, 246, 0.12)",
       fill: true,
       tension: 0.35,
       pointRadius: 0,
       pointHoverRadius: 4,
-      borderWidth: 2
-    }
-  ]
-}))
+      borderWidth: 2,
+    },
+  ],
+}));
 
 const flowChartData = computed(() => ({
   datasets: [
     {
-      label: 'Rated Flow',
+      label: "Rated Flow",
       data: generateSeries(valve.value?.rated_flow),
-      borderColor: '#22c55e',
-      backgroundColor: 'rgba(34, 197, 94, 0.08)',
+      borderColor: "#22c55e",
+      backgroundColor: "rgba(34, 197, 94, 0.08)",
       fill: false,
       tension: 0.35,
       pointRadius: 0,
       pointHoverRadius: 4,
-      borderWidth: 2
+      borderWidth: 2,
     },
     {
-      label: 'Maximum Flow',
+      label: "Maximum Flow",
       data: generateSeries(valve.value?.max_flow),
-      borderColor: '#3b82f6',
-      backgroundColor: 'rgba(59, 130, 246, 0.08)',
+      borderColor: "#3b82f6",
+      backgroundColor: "rgba(59, 130, 246, 0.08)",
       fill: false,
       tension: 0.35,
       pointRadius: 0,
       pointHoverRadius: 4,
-      borderWidth: 2
-    }
-  ]
-}))
+      borderWidth: 2,
+    },
+  ],
+}));
 
 function makeProgressiveAnimation(totalDuration = 1200) {
-  const delayBetweenPoints = totalDuration / STEPS
+  const delayBetweenPoints = totalDuration / STEPS;
 
   const previousY = (context) => {
     if (context.index === 0) {
-      return context.chart.scales.y.getPixelForValue(0)
+      return context.chart.scales.y.getPixelForValue(0);
     }
 
-    const previousPoint = context.chart
-      .getDatasetMeta(context.datasetIndex)
-      .data[context.index - 1]
+    const previousPoint = context.chart.getDatasetMeta(context.datasetIndex)
+      .data[context.index - 1];
 
-    return previousPoint?.getProps(['y'], true).y
-  }
+    return previousPoint?.getProps(["y"], true).y;
+  };
 
   return {
     x: {
-      type: 'number',
-      easing: 'easeOutQuad',
+      type: "number",
+      easing: "easeOutQuad",
       duration: delayBetweenPoints,
       from: Number.NaN,
       delay(context) {
-        if (context.type !== 'data' || context.xStarted) return 0
-        context.xStarted = true
-        return context.index * delayBetweenPoints
-      }
+        if (context.type !== "data" || context.xStarted) return 0;
+        context.xStarted = true;
+        return context.index * delayBetweenPoints;
+      },
     },
     y: {
-      type: 'number',
-      easing: 'easeOutQuad',
+      type: "number",
+      easing: "easeOutQuad",
       duration: delayBetweenPoints,
       from: previousY,
       delay(context) {
-        if (context.type !== 'data' || context.yStarted) return 0
-        context.yStarted = true
-        return context.index * delayBetweenPoints
-      }
-    }
-  }
+        if (context.type !== "data" || context.yStarted) return 0;
+        context.yStarted = true;
+        return context.index * delayBetweenPoints;
+      },
+    },
+  };
 }
 
 const chartOptions = {
@@ -356,71 +353,71 @@ const chartOptions = {
   animation: makeProgressiveAnimation(),
   interaction: {
     intersect: false,
-    mode: 'index'
+    mode: "index",
   },
   plugins: {
     legend: {
       display: true,
-      position: 'bottom',
+      position: "bottom",
       labels: {
         boxWidth: 10,
         boxHeight: 3,
         usePointStyle: true,
-        pointStyle: 'line',
+        pointStyle: "line",
         padding: 12,
-        font: { size: 10 }
-      }
+        font: { size: 10 },
+      },
     },
-    tooltip: { enabled: true }
+    tooltip: { enabled: true },
   },
   scales: {
     x: {
       display: false,
-      type: 'linear',
-      grid: { display: false }
+      type: "linear",
+      grid: { display: false },
     },
     y: {
       beginAtZero: true,
       border: { display: false },
-      grid: { color: 'rgba(148, 163, 184, 0.14)' },
+      grid: { color: "rgba(148, 163, 184, 0.14)" },
       ticks: {
-        color: '#64748b',
-        font: { size: 9 }
-      }
-    }
-  }
-}
+        color: "#64748b",
+        font: { size: 9 },
+      },
+    },
+  },
+};
 
 const feedback = ref({
   position: 65,
   current: 1.25,
   temperature: 42,
-  status: 'Normal'
-})
+  status: "Normal",
+});
 
 onMounted(async () => {
-  await loadValves()
+  await loadValves();
 
   if (route.params.id) {
-    await fetchValveById(route.params.id)
+    await fetchValveById(route.params.id);
   }
 
-  window.addEventListener('keydown', handleImageViewerKeydown)
-})
+  window.addEventListener("keydown", handleImageViewerKeydown);
+});
 
 onBeforeUnmount(() => {
-  window.removeEventListener('keydown', handleImageViewerKeydown)
-  document.body.style.overflow = ''
-})
+  window.removeEventListener("keydown", handleImageViewerKeydown);
+  document.body.style.overflow = "";
+});
 
 watch(
   () => route.params.id,
   async (newId) => {
     if (newId) {
-      await fetchValveById(newId)
+      await fetchValveById(newId);
     }
-  }
-)
+  },
+);
 </script>
 
 <template>
@@ -434,15 +431,14 @@ watch(
           placeholder="Search valve by part number"
           class="valve-search"
           @complete="search"
-          @item-select="onSelect"
-        >
+          @item-select="onSelect">
           <template #option="slotProps">
             <div class="search-option">
               <strong>{{ slotProps.option.part_number }}</strong>
               <span>
-                {{ slotProps.option.manufacturer || '-' }}
+                {{ slotProps.option.manufacturer || "-" }}
                 ·
-                {{ slotProps.option.valve_type || '-' }}
+                {{ slotProps.option.valve_type || "-" }}
               </span>
             </div>
           </template>
@@ -452,8 +448,7 @@ watch(
           label="Show Valve"
           icon="pi pi-search"
           :disabled="!pendingValve"
-          @click="confirmShow"
-        />
+          @click="confirmShow" />
       </div>
 
       <div v-if="valve" class="selected-valve">
@@ -466,8 +461,8 @@ watch(
       <i class="pi pi-sliders-h"></i>
       <h3>No valve selected</h3>
       <p>
-        Search for a valve by part number and select Show Valve
-        to open the test workspace.
+        Search for a valve by part number and select Show Valve to open the test
+        workspace.
       </p>
     </div>
 
@@ -482,8 +477,7 @@ watch(
             class="panel-action"
             title="Open image viewer"
             aria-label="Open valve image viewer"
-            @click="openImageViewer"
-          >
+            @click="openImageViewer">
             <i class="pi pi-window-maximize"></i>
           </button>
         </header>
@@ -493,13 +487,11 @@ watch(
           type="button"
           class="picture-content picture-button"
           title="Click to enlarge"
-          @click="openImageViewer"
-        >
+          @click="openImageViewer">
           <img
             :src="imageUrl"
             :alt="`Valve ${valve.part_number}`"
-            class="valve-image"
-          />
+            class="valve-image" />
 
           <span class="image-expand-hint">
             <i class="pi pi-search-plus"></i>
@@ -517,9 +509,9 @@ watch(
         <footer class="valve-information">
           <strong>{{ valve.part_number }}</strong>
           <span>
-            {{ valve.component_series || '-' }}
+            {{ valve.component_series || "-" }}
             ·
-            {{ valve.valve_type || '-' }}
+            {{ valve.valve_type || "-" }}
           </span>
         </footer>
       </section>
@@ -547,8 +539,7 @@ watch(
               severity="secondary"
               outlined
               class="datasheet-button"
-              @click="openDatasheet"
-            />
+              @click="openDatasheet" />
           </template>
 
           <template v-else>
@@ -568,7 +559,7 @@ watch(
         <header class="panel-header">
           <h3>Pressure</h3>
           <div class="primary-metric">
-            <strong>{{ valve.max_pressure ?? '-' }}</strong>
+            <strong>{{ valve.max_pressure ?? "-" }}</strong>
             <span>bar</span>
           </div>
         </header>
@@ -577,8 +568,7 @@ watch(
           <Line
             :key="`${valve.id}-pressure`"
             :data="pressureChartData"
-            :options="chartOptions"
-          />
+            :options="chartOptions" />
         </div>
       </section>
 
@@ -588,11 +578,11 @@ watch(
           <div class="flow-metrics">
             <div>
               <span>Rated</span>
-              <strong>{{ valve.rated_flow ?? '-' }}</strong>
+              <strong>{{ valve.rated_flow ?? "-" }}</strong>
             </div>
             <div>
               <span>Maximum</span>
-              <strong>{{ valve.max_flow ?? '-' }}</strong>
+              <strong>{{ valve.max_flow ?? "-" }}</strong>
             </div>
           </div>
         </header>
@@ -601,8 +591,7 @@ watch(
           <Line
             :key="`${valve.id}-flow`"
             :data="flowChartData"
-            :options="chartOptions"
-          />
+            :options="chartOptions" />
         </div>
       </section>
 
@@ -615,12 +604,12 @@ watch(
         <div class="command-content">
           <div class="command-item">
             <span>Command Type</span>
-            <strong>{{ valve.command_type || '-' }}</strong>
+            <strong>{{ valve.command_type || "-" }}</strong>
           </div>
           <div class="command-divider"></div>
           <div class="command-item">
             <span>Command Value</span>
-            <strong>{{ valve.command_value ?? '-' }}</strong>
+            <strong>{{ valve.command_value ?? "-" }}</strong>
           </div>
         </div>
       </section>
@@ -672,8 +661,7 @@ watch(
             class="control-button"
             :loading="isStarting"
             :disabled="!valve || isStarting || controlStatus === 'active'"
-            @click="startValve"
-          />
+            @click="startValve" />
 
           <Button
             label="Stop"
@@ -683,8 +671,7 @@ watch(
             class="control-button"
             :loading="isStopping"
             :disabled="!valve || isStopping || controlStatus === 'stopped'"
-            @click="stopValve"
-          />
+            @click="stopValve" />
 
           <Button
             :label="isRecording ? 'Stop Record' : 'Record'"
@@ -693,23 +680,21 @@ watch(
             outlined
             class="control-button"
             :disabled="!valve"
-            @click="toggleRecord"
-          />
+            @click="toggleRecord" />
 
           <Button
             label="Send Command"
             icon="pi pi-send"
             class="control-button"
             :disabled="!valve"
-            @click="sendCommand"
-          />
+            @click="sendCommand" />
         </div>
 
         <div class="output-status">
           <span class="output-label">OUTPUT STATUS</span>
           <div class="status-badge" :class="controlStatus">
             <span class="status-dot"></span>
-            <span>{{ controlStatus === 'active' ? 'Active' : 'Stopped' }}</span>
+            <span>{{ controlStatus === "active" ? "Active" : "Stopped" }}</span>
           </div>
         </div>
       </section>
@@ -723,12 +708,11 @@ watch(
           role="dialog"
           aria-modal="true"
           aria-label="Valve image viewer"
-          @click.self="closeImageViewer"
-        >
+          @click.self="closeImageViewer">
           <header class="viewer-header">
             <div>
               <span>VALVE IMAGE</span>
-              <strong>{{ valve?.part_number || '-' }}</strong>
+              <strong>{{ valve?.part_number || "-" }}</strong>
             </div>
 
             <button
@@ -736,8 +720,7 @@ watch(
               class="viewer-close-button"
               aria-label="Close image viewer"
               title="Close image viewer"
-              @click="closeImageViewer"
-            >
+              @click="closeImageViewer">
               <i class="pi pi-times"></i>
             </button>
           </header>
@@ -746,15 +729,14 @@ watch(
             <img
               :src="imageUrl"
               :alt="`Valve ${valve?.part_number || ''}`"
-              class="viewer-image"
-            />
+              class="viewer-image" />
           </div>
 
           <footer class="viewer-footer">
             <span>
-              {{ valve?.component_series || '-' }}
+              {{ valve?.component_series || "-" }}
               ·
-              {{ valve?.valve_type || '-' }}
+              {{ valve?.valve_type || "-" }}
             </span>
             <span>Press ESC or click outside the image to close</span>
           </footer>
@@ -864,13 +846,27 @@ watch(
   gap: 0.85rem;
 }
 
-.picture-panel { grid-area: picture; }
-.datasheet-panel { grid-area: datasheet; }
-.pressure-panel { grid-area: pressure; }
-.flow-panel { grid-area: flow; }
-.command-panel { grid-area: command; }
-.feedback-panel { grid-area: feedback; }
-.control-panel { grid-area: controls; }
+.picture-panel {
+  grid-area: picture;
+}
+.datasheet-panel {
+  grid-area: datasheet;
+}
+.pressure-panel {
+  grid-area: pressure;
+}
+.flow-panel {
+  grid-area: flow;
+}
+.command-panel {
+  grid-area: command;
+}
+.feedback-panel {
+  grid-area: feedback;
+}
+.control-panel {
+  grid-area: controls;
+}
 
 .panel {
   min-width: 0;
@@ -910,7 +906,9 @@ watch(
   font-size: 0.88rem;
 }
 
-.pdf-icon { color: #dc2626; }
+.pdf-icon {
+  color: #dc2626;
+}
 
 .panel-action {
   width: 1.85rem;
@@ -1004,8 +1002,12 @@ watch(
   border-radius: 2px;
 }
 
-.image-placeholder i { font-size: 1.45rem; }
-.image-placeholder span { font-size: 0.65rem; }
+.image-placeholder i {
+  font-size: 1.45rem;
+}
+.image-placeholder span {
+  font-size: 0.65rem;
+}
 
 .valve-information {
   display: flex;
@@ -1055,7 +1057,9 @@ watch(
   border-radius: 3px;
 }
 
-.document-symbol i { font-size: 1.45rem; }
+.document-symbol i {
+  font-size: 1.45rem;
+}
 
 .document-symbol.unavailable {
   color: var(--text-muted);
@@ -1211,8 +1215,13 @@ watch(
   border-right: 1px solid #475569;
 }
 
-.feedback-item:first-child { padding-left: 0; }
-.feedback-item:last-child { padding-right: 0; border-right: none; }
+.feedback-item:first-child {
+  padding-left: 0;
+}
+.feedback-item:last-child {
+  padding-right: 0;
+  border-right: none;
+}
 
 .feedback-item > div {
   display: flex;
@@ -1264,7 +1273,9 @@ watch(
   flex: 1;
 }
 
-.control-button { width: 100%; }
+.control-button {
+  width: 100%;
+}
 
 .output-status {
   display: flex;
@@ -1453,7 +1464,9 @@ watch(
 }
 
 @media (max-width: 1100px) {
-  .records-page { overflow-y: auto; }
+  .records-page {
+    overflow-y: auto;
+  }
 
   .records-grid {
     flex: none;
@@ -1465,7 +1478,9 @@ watch(
     grid-template-rows: 220px 190px auto;
   }
 
-  .output-status { display: none; }
+  .output-status {
+    display: none;
+  }
 }
 
 @media (max-width: 820px) {
@@ -1482,19 +1497,29 @@ watch(
   }
 
   .picture-panel,
-  .datasheet-panel { min-height: 230px; }
+  .datasheet-panel {
+    min-height: 230px;
+  }
 
   .pressure-panel,
-  .flow-panel { min-height: 260px; }
+  .flow-panel {
+    min-height: 260px;
+  }
 
   .command-panel,
-  .feedback-panel { min-height: 190px; }
+  .feedback-panel {
+    min-height: 190px;
+  }
 
-  .control-buttons { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .control-buttons {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 580px) {
-  .records-page { overflow-y: auto; }
+  .records-page {
+    overflow-y: auto;
+  }
 
   .search-toolbar,
   .search-section,
@@ -1508,7 +1533,9 @@ watch(
     max-width: none;
   }
 
-  .selected-valve { align-items: flex-start; }
+  .selected-valve {
+    align-items: flex-start;
+  }
 
   .records-grid {
     display: flex;
@@ -1519,25 +1546,43 @@ watch(
   .picture-panel,
   .datasheet-panel,
   .command-panel,
-  .feedback-panel { min-height: 215px; }
+  .feedback-panel {
+    min-height: 215px;
+  }
 
   .pressure-panel,
-  .flow-panel { min-height: 280px; }
+  .flow-panel {
+    min-height: 280px;
+  }
 
-  .control-buttons { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .control-buttons {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 
   .output-status {
     display: flex;
     align-items: stretch;
   }
 
-  .status-badge { width: 100%; }
-  .feedback-item { padding: 0 0.4rem; }
-  .flow-metrics { gap: 0.55rem; }
-  .image-expand-hint { opacity: 1; }
+  .status-badge {
+    width: 100%;
+  }
+  .feedback-item {
+    padding: 0 0.4rem;
+  }
+  .flow-metrics {
+    gap: 0.55rem;
+  }
+  .image-expand-hint {
+    opacity: 1;
+  }
 
-  .image-viewer { padding: 0.75rem; }
-  .viewer-content { padding: 0.75rem 0; }
+  .image-viewer {
+    padding: 0.75rem;
+  }
+  .viewer-content {
+    padding: 0.75rem 0;
+  }
 
   .viewer-footer {
     align-items: flex-start;
@@ -1548,7 +1593,9 @@ watch(
 }
 
 @media (max-width: 390px) {
-  .control-buttons { grid-template-columns: 1fr; }
+  .control-buttons {
+    grid-template-columns: 1fr;
+  }
 
   .feedback-content {
     grid-template-columns: 1fr;

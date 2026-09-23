@@ -10,7 +10,7 @@ http:
     - name: Content-Type
       value: application/json
     - name: Authorization
-      value: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3ODg0NzU2OTIsInJvbGUiOiJhZG1pbiIsInVzZXJfaWQiOjEsInVzZXJuYW1lIjoiYWRtaW4ifQ.zDDuENf7lCsMwZeRLfyVQIv5mXjyw9UPPI-Q6KZJ7gM
+      value: Bearer {{jwt_token}}
   auth: inherit
 
 settings:
