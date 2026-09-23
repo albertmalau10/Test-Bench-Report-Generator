@@ -1,0 +1,27 @@
+info:
+  name: POST /valves/:id/datasheet
+  type: http
+  seq: 8
+
+http:
+  method: POST
+  url: http://localhost:8080/valves/1/datasheet
+  params:
+    - name: ""
+      value: ""
+      type: query
+      disabled: true
+  body:
+    type: multipart-form
+    data:
+      - name: datasheet
+        type: file
+        value:
+          - C:\Users\MAA6JK\Downloads\valve_database\datasheets\RE 29123_2023-03.pdf
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

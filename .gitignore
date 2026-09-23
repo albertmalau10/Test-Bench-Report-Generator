@@ -1,0 +1,27 @@
+# Environment
+backend/.env
+.env
+.env.*
+
+# SQLite
+backend/data.db
+*.db
+*.sqlite
+*.sqlite3
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# VSCode
+.vscode/
+
+# Generated files
+repomix-output.xml
+
+# Logs
+*.log
+
+# Go build
+*.exe
+*.out

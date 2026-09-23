@@ -1,0 +1,20 @@
+info:
+  name: GET /seting
+  type: http
+  seq: 11
+
+http:
+  method: GET
+  url: http://localhost:8080/settings
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Authorization
+      value: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3ODg0NzU2OTIsInJvbGUiOiJhZG1pbiIsInVzZXJfaWQiOjEsInVzZXJuYW1lIjoiYWRtaW4ifQ.zDDuENf7lCsMwZeRLfyVQIv5mXjyw9UPPI-Q6KZJ7gM
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

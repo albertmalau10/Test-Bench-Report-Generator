@@ -1,0 +1,59 @@
+import axios from 'axios'
+import { useAuthStore } from '../stores/auth'
+
+const api = axios.create({
+  baseURL: 'http://localhost:8080',
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+
+api.interceptors.request.use((config) => {
+  const authStore = useAuthStore()
+  if (authStore.token) {
+    config.headers.Authorization = `Bearer ${authStore.token}`
+  }
+  return config
+})
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const isLoginRequest = error.config?.url?.includes('/login')
+
+    if (error.response?.status === 401 && !isLoginRequest) {
+      const authStore = useAuthStore()
+      authStore.logout()
+      window.location.href = '/login'
+    }
+    return Promise.reject(error)
+  }
+)
+
+export function uploadValveImage(id, file) {
+  const formData = new FormData()
+  formData.append('image', file)
+
+  return api.post(`/valves/${id}/image`, formData, {
+    headers: { 'Content-Type': undefined }
+  })
+}
+
+export function uploadValveDatasheet(id, file) {
+  const formData = new FormData()
+  formData.append('datasheet', file)
+
+  return api.post(`/valves/${id}/datasheet`, formData, {
+    headers: { 'Content-Type': undefined }
+  })
+}
+
+export function startOutput() {
+  return api.post('/ctrlx/start')
+}
+
+export function stopOutput() {
+  return api.post('/ctrlx/stop')
+}
+
+export default api

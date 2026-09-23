@@ -1,0 +1,51 @@
+:root {
+  --bg-color: #f1f5f9;
+  --sidebar-bg: #ffffff;
+  --sidebar-text: #475569;
+  --sidebar-text-active: #2563eb;
+  --sidebar-active-bg: #eff6ff;
+  --topbar-bg: #ffffff;
+  --card-bg: #ffffff;
+  --text-color: #1e293b;
+  --text-muted: #64748b;
+  --border-color: #e2e8f0;
+  --primary-color: #2563eb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+}
+
+.p-dark {
+  --bg-color: #0f172a;
+  --sidebar-bg: #1e293b;
+  --sidebar-text: #cbd5e1;
+  --sidebar-text-active: #60a5fa;
+  --sidebar-active-bg: #334155;
+  --topbar-bg: #1e293b;
+  --card-bg: #1e293b;
+  --text-color: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+  --primary-color: #60a5fa;
+}
+
+html, body, #app {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+.brand-logo {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}

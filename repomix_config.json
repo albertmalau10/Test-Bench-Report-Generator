@@ -1,0 +1,18 @@
+{
+  "output": {
+    "filePath": "repomix-output.xml",
+    "style": "xml"
+  },
+  "ignore": {
+    "customPatterns": [
+      "**/node_modules/**",
+      "**/datasheets/**",
+      "**/images/**",
+      "**/*.db",
+      "**/package-lock.json",
+      "**/go.sum",
+      "**/.git/**",
+      "**/.vscode/**"
+    ]
+  }
+}
