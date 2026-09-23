@@ -14,14 +14,18 @@ import (
 func ConnectDB() *gorm.DB{
 	dbPath := os.Getenv("DB_PATH")
 	if dbPath == "" {
-	dbPath = "./data.db"
+		dbPath = "./data.db"
 	}
 
-	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(dbPath+"?_pragma=journal_mode(WAL)"), &gorm.Config{})
 	if err != nil {
 		log.Fatal("gagal terhubung ke database:", err)
 	}
-	
+
+	sqlDB, err := db.DB()
+	if err == nil {
+		sqlDB.SetMaxOpenConns(1)
+	}
 
 	if err = db.AutoMigrate(&models.Valve{}, &models.User{}, &models.Settings{}); err != nil {
 		log.Fatal("gagal migrasi tabel:", err)
@@ -31,7 +35,6 @@ func ConnectDB() *gorm.DB{
 
 	return db
 }
-
 func SeedUsers(db *gorm.DB) {
 	adminPassword := os.Getenv("ADMIN_PASSWORD")
 	operatorPassword := os.Getenv("OPERATOR_PASSWORD")

@@ -5,8 +5,8 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"io"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -22,15 +22,14 @@ func writeBoolToCtrlX(
 ) error {
 
 	payload := map[string]interface{}{
-    "type":  "bool8",
-    "value": value,
+		"type":  "bool8",
+		"value": value,
 	}
 
 	body, err := json.Marshal(payload)
 	if err != nil {
-    	return err
+		return err
 	}
-
 
 	url := fmt.Sprintf(
 		"https://%s/automation/api/v2/nodes/%s",
@@ -77,23 +76,27 @@ func writeBoolToCtrlX(
 	responseBody, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode >= 300 {
-    return fmt.Errorf(
-        "ctrlX returned status %d: %s",
-        resp.StatusCode,
-        string(responseBody),
-    )
-}
+		return fmt.Errorf(
+			"ctrlX returned status %d: %s",
+			resp.StatusCode,
+			string(responseBody),
+		)
+	}
 
 	return nil
 }
 
 func StartOutput(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-
 		var s models.Settings
-
 		db.First(&s, 1)
 
+		if s.CtrlxHost == "" || s.CtrlxToken == "" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "ctrlX settings are not configured. Please configure host and token in settings.",
+			})
+			return
+		}
 		err := writeBoolToCtrlX(
 			s.CtrlxHost,
 			s.CtrlxToken,
@@ -115,11 +118,15 @@ func StartOutput(db *gorm.DB) gin.HandlerFunc {
 }
 func StopOutput(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-
 		var s models.Settings
-
 		db.First(&s, 1)
 
+		if s.CtrlxHost == "" || s.CtrlxToken == "" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "ctrlX settings are not configured. Please configure host and token in settings.",
+			})
+			return
+		}
 		err := writeBoolToCtrlX(
 			s.CtrlxHost,
 			s.CtrlxToken,
@@ -139,4 +146,3 @@ func StopOutput(db *gorm.DB) gin.HandlerFunc {
 		})
 	}
 }
-

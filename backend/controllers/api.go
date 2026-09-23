@@ -3,8 +3,10 @@ package controllers
 import(
 	"net/http"
 	"fmt"
+	"strings"
 	"path/filepath"
 	"time"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"valve_database/models"
@@ -67,6 +69,7 @@ func GetValveByID(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
+// backend/controllers/api.go
 func UpdateValve(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
@@ -94,15 +97,12 @@ func UpdateValve(db *gorm.DB) gin.HandlerFunc {
 		valve.CommandValue = updatedValve.CommandValue
 		valve.CommandType = updatedValve.CommandType
 		valve.MaxPressure = updatedValve.MaxPressure
-		valve.ImagePath = updatedValve.ImagePath
-		valve.DatasheetPath = updatedValve.DatasheetPath
 
 		db.Save(&valve)
 
 		c.JSON(http.StatusOK, valve)
 	}
 }
-
 func DeleteValve(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
@@ -111,6 +111,14 @@ func DeleteValve(db *gorm.DB) gin.HandlerFunc {
 		if result := db.First(&valve, id); result.Error != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "valve tidak ditemukan"})
 			return
+		}
+
+		// Remove associated files from disk
+		if valve.ImagePath != "" {
+			os.Remove(strings.TrimPrefix(valve.ImagePath, "/"))
+		}
+		if valve.DatasheetPath != "" {
+			os.Remove(strings.TrimPrefix(valve.DatasheetPath, "/"))
 		}
 
 		db.Delete(&valve)
@@ -135,7 +143,25 @@ func UploadValveImage(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		ext := filepath.Ext(file.Filename)
+		// Extract and validate the file extension (Security Fix)
+		ext := strings.ToLower(filepath.Ext(file.Filename))
+		allowedExts := map[string]bool{
+			".jpg":  true,
+			".jpeg": true,
+			".png":  true,
+			".webp": true,
+		}
+
+		if !allowedExts[ext] {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "format file tidak diizinkan. Gunakan JPG, PNG, atau WEBP."})
+			return
+		}
+
+		// Remove old image if it exists before saving the new one
+		if valve.ImagePath != "" {
+			os.Remove(strings.TrimPrefix(valve.ImagePath, "/"))
+		}
+
 		newFileName := fmt.Sprintf("%s_%d%s", id, time.Now().Unix(), ext)
 		savePath := filepath.Join("images", newFileName)
 
@@ -171,6 +197,11 @@ func UploadValveDatasheet(db *gorm.DB) gin.HandlerFunc {
 		if ext != ".pdf" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "file harus berformat PDF"})
 			return
+		}
+
+		// Remove old datasheet if it exists before saving the new one
+		if valve.DatasheetPath != "" {
+			os.Remove(strings.TrimPrefix(valve.DatasheetPath, "/"))
 		}
 
 		newFileName := fmt.Sprintf("%s_%d%s", id, time.Now().Unix(), ext)

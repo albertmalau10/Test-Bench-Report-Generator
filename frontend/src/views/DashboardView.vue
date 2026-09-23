@@ -62,8 +62,7 @@
               type="pie"
               :data="chartData"
               :options="chartOptions"
-              class="w-full h-full"
-            />
+              class="w-full h-full" />
             <div v-else class="empty-state">
               <i class="pi pi-chart-pie text-4xl text-color-secondary mb-2"></i>
               <div class="text-color-secondary">No data yet</div>
@@ -76,54 +75,60 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import axios from 'axios'
+import { ref, onMounted } from "vue";
+import { useRouter } from "vue-router";
 
 // PrimeVue components (explicit import in case they're not registered globally)
-import Card from 'primevue/card'
-import Button from 'primevue/button'
-import Chart from 'primevue/chart'
+import Card from "primevue/card";
+import Button from "primevue/button";
+import Chart from "primevue/chart";
+import api from '../services/api'
 
 // Base URL for your Go/Gin backend
-const API_BASE = 'http://localhost:8080'
-
-const router = useRouter()
+const router = useRouter();
 
 const summary = ref({
   totalRegistered: 0,
-  activeTested: 0, 
+  activeTested: 0,
   incompleteData: 0,
-})
+});
 
-const loadingSummary = ref(false)
-const loadingChart = ref(false)
+const loadingSummary = ref(false);
+const loadingChart = ref(false);
 
 const chartData = ref({
   labels: [],
   datasets: [
     {
       data: [],
-      backgroundColor: ['#42A5F5', '#66BB6A', '#FFA726', '#EF5350', '#AB47BC', '#26C6DA', '#8D6E63'],
+      backgroundColor: [
+        "#42A5F5",
+        "#66BB6A",
+        "#FFA726",
+        "#EF5350",
+        "#AB47BC",
+        "#26C6DA",
+        "#8D6E63",
+      ],
     },
   ],
-})
+});
 
 const chartOptions = ref({
   plugins: {
     legend: {
-      position: 'right',
+      position: "right",
     },
   },
   maintainAspectRatio: false,
-})
+});
 
 function goToValveList() {
-  router.push('/valves')
+  router.push("/valves");
 }
 
 function goToRecords() {
-  router.push('/records')
+  router.push("/records");
 }
 
 function isIncomplete(valve) {
@@ -137,41 +142,41 @@ function isIncomplete(valve) {
     !valve.command_type ||
     valve.command_value === null ||
     valve.command_value === undefined ||
-    valve.command_value === ''
-  )
+    valve.command_value === ""
+  );
 }
 
 async function fetchSummary(valves) {
-  loadingSummary.value = true
+  loadingSummary.value = true;
   try {
-    summary.value.totalRegistered = valves.length
-    summary.value.incompleteData = valves.filter(isIncomplete).length
+    summary.value.totalRegistered = valves.length;
+    summary.value.incompleteData = valves.filter(isIncomplete).length;
     // activeTested left at 0 for now — depends on the Records endpoint,
     // which we're wiring up separately.
   } finally {
-    loadingSummary.value = false
+    loadingSummary.value = false;
   }
 }
 
 async function fetchChartData(valves) {
-  loadingChart.value = true
+  loadingChart.value = true;
   try {
     // Group valves by component_series (e.g. "3X", "4X", "5X")
-    const counts = {}
+    const counts = {};
     for (const valve of valves) {
-      const key = valve.component_series || 'Unspecified'
-      counts[key] = (counts[key] || 0) + 1
+      const key = valve.component_series || "Unspecified";
+      counts[key] = (counts[key] || 0) + 1;
     }
-    chartData.value.labels = Object.keys(counts)
-    chartData.value.datasets[0].data = Object.values(counts)
+    chartData.value.labels = Object.keys(counts);
+    chartData.value.datasets[0].data = Object.values(counts);
   } finally {
-    loadingChart.value = false
+    loadingChart.value = false;
   }
 }
 
 async function loadDashboardData() {
   try {
-    const { data } = await axios.get(`${API_BASE}/valves`)
+    const { data } = await api.get('/valves')
     const valves = Array.isArray(data) ? data : []
     await fetchSummary(valves)
     await fetchChartData(valves)
@@ -181,8 +186,8 @@ async function loadDashboardData() {
 }
 
 onMounted(() => {
-  loadDashboardData()
-})
+  loadDashboardData();
+});
 </script>
 
 <style scoped>

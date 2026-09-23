@@ -33,6 +33,10 @@ func main() {
 	}
 	defer sqlDB.Close()
 
+	// FIX
+	os.MkdirAll("./images", os.ModePerm)
+	os.MkdirAll("./datasheets", os.ModePerm)
+
 	router := gin.Default()
 
 

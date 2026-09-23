@@ -33,7 +33,7 @@ const routes = [
       { path: 'valves/details', name: 'valve-details-search', component: ValveDetailsView },
       { path: 'valves/:id', name: 'valve-details', component: ValveDetailsView },
       { path: 'records', name: 'records', component: RecordsView },
-      { path: 'settings', name: 'settings', component: SettingView },
+      { path: 'settings', name: 'settings', component: SettingView, meta: { requiresAdmin: true } },
     ]
   }
 ]
@@ -49,7 +49,10 @@ router.beforeEach((to, from, next) => {
   if (to.meta.requiresAuth && !authStore.isLoggedIn) {
     next({ name: 'login' })
   } else if (to.name === 'login' && authStore.isLoggedIn) {
-    next({ name: 'dashboard' }) // sudah login, tidak perlu ke halaman login lagi
+    next({ name: 'dashboard' })
+  // FIX: Enforce admin role check
+  } else if (to.meta.requiresAdmin && !authStore.isAdmin) {
+    next({ name: 'dashboard' }) 
   } else {
     next()
   }
