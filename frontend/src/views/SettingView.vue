@@ -283,6 +283,25 @@ onUnmounted(() => {
               placeholder="ns=2;s=testbench/sensors/flow" />
           </div>
         </div>
+        <div class="field">
+          <div class="label-row">
+            <label>HPU Status Node ID</label>
+            <span
+              class="status-dot"
+              :class="opcStatus.output.connected ? 'connected' : 'disconnected'"
+              title="Node Status"></span>
+          </div>
+          <div class="input-with-value">
+            <InputText
+              :value="opcStatus.output.value"
+              readonly
+              class="live-value-box"
+              tabindex="-1" />
+            <InputText
+              v-model="settings.opc_node_output"
+              placeholder="ns=2;s=plc/app/Application/sym/PLC_PRG/output" />
+          </div>
+        </div>
       </div>
 
       <div class="actions">
