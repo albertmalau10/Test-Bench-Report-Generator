@@ -25,3 +25,7 @@ repomix-output.xml
 # Go build
 *.exe
 *.out
+
+backend/client_cert.pem
+backend/client_key.pem
+*.pem
