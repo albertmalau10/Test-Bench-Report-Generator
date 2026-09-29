@@ -317,7 +317,7 @@ onUnmounted(() => {
 
 <style scoped>
 .settings-page {
-  padding: 0.5rem 1.5rem;
+  padding: 1rem;
   overflow-y: auto;
   height: 100%;
 }
@@ -332,12 +332,12 @@ h2 {
   background: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  padding: 1rem 1.25rem;
+  padding: 1.5rem;
   max-width: 1200px;
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem; /* Crushed section gaps */
+  gap: 1rem;
 }
 
 .section-title {
@@ -348,27 +348,26 @@ h2 {
   color: var(--primary-color);
   border-bottom: 1px solid var(--border-color);
   padding-bottom: 0.25rem;
-  margin-bottom: 0;
-  font-size: 0.95rem;
+  margin-bottom: -0.25rem;
 }
 
 .server-status {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   color: var(--text-muted);
   font-weight: 500;
 }
 
 .mt-4 {
-  margin-top: 0.25rem;
+  margin-top: 0.5rem;
 }
 
 .node-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.4rem 1.5rem; /* Crushed vertical row gaps */
+  gap: 1rem 1.5rem;
 }
 
 .field {
@@ -421,11 +420,13 @@ h2 {
 
 /* Status Indicator Dots */
 .status-dot {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background-color: #ef4444;
-  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    box-shadow 0.3s ease;
   flex-shrink: 0;
 }
 .status-dot.connected {
@@ -451,4 +452,4 @@ h2 {
     grid-template-columns: 1fr;
   }
 }
-</style> 
+</style>

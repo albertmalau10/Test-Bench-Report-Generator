@@ -1,6 +1,15 @@
 import axios from 'axios'
 import { useAuthStore } from '../stores/auth'
 
+// The backend for this build lives at <BASE_URL>api — e.g.
+// "/valve-database-app/api" once behind ctrlX CORE's reverse proxy
+// (see vite.config.js's `base` and backend/main.go's /api route
+// group), or "/api" for a plain local `npm run dev` at "/". Set
+// VITE_API_URL to point at a backend on a different origin instead
+// (e.g. http://localhost:8080/api for local dev against `go run .`
+// directly, without the Vite dev-server proxy).
+export const API_ORIGIN = import.meta.env.VITE_API_URL || `${import.meta.env.BASE_URL}api`
+
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080',
   headers: {

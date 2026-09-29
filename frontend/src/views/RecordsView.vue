@@ -327,26 +327,27 @@ const chartOptions = {
   interaction: { intersect: false, mode: "index" },
   plugins: {
     legend: {
-      display: true, 
+      display: true,
       position: "bottom",
-      labels: { 
-        boxWidth: 8, 
-        usePointStyle: true, 
-        padding: 5, // Reduced from 12 to make the legend box tighter
-        font: { size: 9 } 
+      labels: {
+        boxWidth: 10,
+        boxHeight: 3,
+        usePointStyle: true,
+        padding: 12,
+        font: { size: 10 },
       },
     },
     tooltip: { enabled: true },
   },
   scales: {
     x: {
-      display: true,
+      display: true, // Unhide the X-Axis
       type: "category",
       grid: { display: false },
       ticks: {
         color: "#64748b",
         font: { size: 9 },
-        maxTicksLimit: 8,
+        maxTicksLimit: 8, // Prevents overcrowding the bottom with 40 timestamps
       },
     },
     y: {
@@ -608,12 +609,12 @@ watch(
   min-height: 42px; /* Reduced from 52px */
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.3rem 0.75rem; /* Tighter internal padding */
+  justify-content: space-between; /* Pushes search to left, values to right */
+  padding: 0.5rem 1rem; /* Slightly wider padding for aesthetics */
   background: var(--card-bg);
   border: 1px solid #475569;
   border-radius: 4px;
-  flex-wrap: wrap;
+  flex-wrap: wrap; /* Allows stacking on very small screens */
   gap: 1rem;
 }
 
@@ -790,12 +791,11 @@ watch(
   min-height: 0;
   min-width: 0; /* Allows panel to shrink with grid */
 }
-
 .chart-container {
   flex: 1;
   min-height: 0;
-  min-width: 0; 
-  padding: 0.5rem 0.75rem 0.1rem 0.75rem; /* Reduced bottom padding from 1rem to 0.1rem */
+  min-width: 0; /* Allows chart to dynamically resize */
+  padding: 0.5rem 1rem 1rem 1rem;
   position: relative;
 }
 
@@ -807,7 +807,7 @@ watch(
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
 }
 .panel-header {
-  padding: 0.4rem 0.8rem; /* Reduced from 0.65rem to save vertical space */
+  padding: 0.65rem 0.8rem;
   background: rgba(148, 163, 184, 0.045);
   border-bottom: 1px solid #475569;
 }

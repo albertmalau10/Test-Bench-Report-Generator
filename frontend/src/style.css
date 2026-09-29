@@ -1,15 +1,86 @@
+/* ============================================================
+   Valve Database App — color theme
+   Repainted to the Bosch Rexroth / ISA-101 high-performance HMI
+   palette: muted, low-saturation backgrounds and status colors,
+   with color reserved for genuine abnormal conditions (alarms) —
+   not for routine "everything is fine" indicators. See the color
+   reference sheet delivered alongside this change for the full
+   swatch + hex + usage table.
+   ============================================================ */
 :root {
-  --bg-color: #f1f5f9;
-  --sidebar-bg: #ffffff;
-  --sidebar-text: #475569;
-  --sidebar-text-active: #2563eb;
-  --sidebar-active-bg: #eff6ff;
-  --topbar-bg: #ffffff;
-  --card-bg: #ffffff;
-  --text-color: #1e293b;
-  --text-muted: #64748b;
-  --border-color: #e2e8f0;
-  --primary-color: #2563eb;
+  /* --- Bosch Rexroth base palette --- */
+  --rexroth-1: #A3BAC8;
+  --rexroth-2: #506E81;
+  --rexroth-3: #002B49;
+  --rexroth-4: #ED0007;
+  --rexroth-5: #91F0FF;
+  --rexroth-6: #00C8F7;
+
+  /* --- ISA-101 semantic tokens --- */
+  --bg-main: #D8DEE3;
+  --bg-panel: #C5D0D8;
+  --bg-card: #EEF1F3;
+
+  --bosch-blue: #002B49;
+  --bosch-blue-2: #506E81;
+
+  --normal: #6F7A80;
+  --stopped: #A3BAC8;
+  --out-of-service: #C9CED1;
+
+  --alarm-high: #ED0007;
+  --alarm-medium: #FF8C00;
+  --alarm-warning: #FFD000;
+
+  --info: #00C8F7;
+
+  --text-primary: #1E1E1E;
+  --text-secondary: #4D4D4D;
+
+  /* --- Trend chart roles (RecordsView) --- */
+  --trend-actual: var(--bosch-blue);
+  --trend-setpoint: var(--info);
+  --trend-warning-limit: var(--alarm-warning);
+  --trend-alarm-limit: var(--alarm-high);
+
+  /* --- Legacy variable names kept so existing components need no
+     changes — all aliased onto the ISA-101 tokens above. Sidebar/
+     topbar map onto the Navigation/Header roles (Top Header +
+     Navigation Active), not onto a plain white theme. --- */
+  --bg-color: var(--bg-main);
+  --sidebar-bg: var(--bosch-blue);
+  --sidebar-text: var(--stopped);
+  --sidebar-text-active: #FFFFFF;
+  --sidebar-active-bg: var(--bosch-blue-2);
+  --topbar-bg: var(--bosch-blue);
+  --card-bg: var(--bg-card);
+  --text-color: var(--text-primary);
+  --text-color-secondary: var(--text-secondary);
+  --text-muted: var(--text-secondary);
+  --border-color: var(--stopped);
+  --primary-color: var(--bosch-blue-2);
+}
+
+/* ISA-101 is a fixed, muted industrial scheme by design — a
+   dark/night mode works against its purpose (reduced saturation so
+   real alarms stand out). The light/dark toggle in useTheme.js is
+   left in place (harmless), but .p-dark intentionally resolves to
+   the SAME tokens instead of an inverted dark palette. Flagged to
+   Rami — if a genuine dark/night variant is wanted later, it should
+   still use muted, desaturated colors, not the old slate-blue dark
+   theme this replaced. */
+.p-dark {
+  --bg-color: var(--bg-main);
+  --sidebar-bg: var(--bosch-blue);
+  --sidebar-text: var(--stopped);
+  --sidebar-text-active: #FFFFFF;
+  --sidebar-active-bg: var(--bosch-blue-2);
+  --topbar-bg: var(--bosch-blue);
+  --card-bg: var(--bg-card);
+  --text-color: var(--text-primary);
+  --text-muted: var(--text-secondary);
+  --border-color: var(--stopped);
+  --primary-color: var(--bosch-blue-2);
 }
 
 * {
@@ -22,20 +93,6 @@ body {
   font-family: 'Segoe UI', Arial, sans-serif;
   background-color: var(--bg-color);
   color: var(--text-color);
-}
-
-.p-dark {
-  --bg-color: #0f172a;
-  --sidebar-bg: #1e293b;
-  --sidebar-text: #cbd5e1;
-  --sidebar-text-active: #60a5fa;
-  --sidebar-active-bg: #334155;
-  --topbar-bg: #1e293b;
-  --card-bg: #1e293b;
-  --text-color: #f1f5f9;
-  --text-muted: #94a3b8;
-  --border-color: #334155;
-  --primary-color: #60a5fa;
 }
 
 html, body, #app {

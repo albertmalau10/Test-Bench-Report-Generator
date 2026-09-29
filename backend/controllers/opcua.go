@@ -312,7 +312,6 @@ func GetOpcStatus(db *gorm.DB) gin.HandlerFunc {
 			if err != nil || len(res.Results) == 0 || res.Results[0].Status != ua.StatusOK {
 				return gin.H{"connected": false, "value": "-"}
 			}
-
 			val := "-"
 			if res.Results[0].Value != nil {
 				val = fmt.Sprintf("%v", res.Results[0].Value.Value())
