@@ -53,7 +53,7 @@ const roleLabel = computed(() => {
   background: none;
   border: none;
   font-size: 1.1rem;
-  color: var(--text-muted);
+  color: var(--sidebar-text);
   cursor: pointer;
   padding: 0.4rem;
   border-radius: 6px;
@@ -70,7 +70,7 @@ const roleLabel = computed(() => {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  color: var(--text-color);
+  color: var(--sidebar-text-active);
   font-weight: 500;
 }
 .profile i {

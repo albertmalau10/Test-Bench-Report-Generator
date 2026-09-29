@@ -1,0 +1,114 @@
+# ctrlX CORE snap definition for the Valve Database App (OPC-UA
+# variant). Structure follows the same pattern as the Report
+# Generator App (reportgen-app) snap already deployed on this ctrlX
+# CORE, adapted for this project's Gin router and /api route group —
+# see backend/main.go for the routing/reverse-proxy details.
+#
+# base is core22 because the ctrlX WORKS "App Build Environment" VM
+# is Ubuntu Server 22.04 (jammy) — snapcraft cannot cross-build a
+# core24 snap on a 22.04 host.
+#
+# Getting started: https://snapcraft.io/docs/getting-started
+# snapcraft.yaml reference: https://snapcraft.io/docs/snapcraft-yaml-reference
+
+name: valve-database-app
+title: Valve Database App (OPC-UA)
+version: "1.0.0"
+icon: assets/icons/icon.png
+summary: Valve Database App with OPC-UA integration (PT Tekno Fluida Indonesia).
+description: |
+  Backend (Go/Gin) + frontend (Vue 3) valve database, recording, and
+  report generator for the hydraulic testbench panel. Integrates with
+  this ctrlX CORE's OPC-UA server for pressure/command/feedback/flow
+  and output control, in addition to the manual valve catalog.
+grade: stable
+confinement: strict
+base: core22
+
+# Physical ctrlX CORE hardware (M3/M4 and similar) is arm64; ctrlX
+# CORE virtual is amd64.
+platforms:
+  amd64:
+  arm64:
+    build-on: [amd64, arm64]
+    build-for: [arm64]
+
+apps:
+  valve-database-app:
+    command: bin/valve-database-backend
+    environment:
+      ADMIN_PASSWORD: "boschrexroth"
+      OPERATOR_PASSWORD: "boschrexroth"
+      JWT_SECRET: "boschrexroth"
+    plugs:
+      - network        # outbound: OPC-UA server, ctrlX Identity Manager REST calls
+      - network-bind    # inbound: the unix socket the reverse proxy connects to
+      - network-status
+      - active-solution # not used for persistence (this app uses $SNAP_DATA
+                         # directly, see main.go) — declared anyway because
+                         # the reverse-proxy integration conventionally expects it.
+    slots:
+      - package-assets
+      - package-run
+    daemon: simple
+    restart-condition: always
+    passthrough:
+      restart-delay: 10s
+
+parts:
+  valve-database-backend:
+    source: ../backend
+    plugin: go
+    override-build: |
+      case $CRAFT_ARCH_TRIPLET_BUILD_FOR in
+        aarch64-linux-gnu)
+          export GOARCH=arm64
+          # CGO_ENABLED=0 only works because database/db.go uses
+          # github.com/glebarez/sqlite (pure Go, no C toolchain
+          # needed) instead of the cgo-based mattn/go-sqlite3.
+          export CGO_ENABLED=0
+          GO111MODULE=on
+          ;;
+        amd64)
+          export GOARCH=amd64
+          ;;
+      esac
+      go build -buildvcs=false -o ../install/bin/valve-database-backend .
+
+  configs:
+    source: ./configs
+    plugin: dump
+    organize:
+      "package-assets/*": package-assets/${CRAFT_PROJECT_NAME}/
+
+  frontend:
+    # Populated by packaging/build-frontend.sh BEFORE snapcraft runs
+    # (npm run build in frontend/, then copied here). Never edit files
+    # under www/ directly; they're regenerated on every build.
+    plugin: dump
+    source: ./www
+    organize:
+      "*": www/
+
+slots:
+  # Sidebar icon + metadata, read-only.
+  package-assets:
+    interface: content
+    content: package-assets
+    source:
+      read:
+        - $SNAP/package-assets/${CRAFT_PROJECT_NAME}
+  # Publishes the unix socket directory so ctrlX CORE's reverse proxy
+  # (running outside this snap's confinement) can connect to it.
+  package-run:
+    interface: content
+    content: package-run
+    source:
+      write:
+        - $SNAP_DATA/package-run/${CRAFT_PROJECT_NAME}
+
+plugs:
+  active-solution:
+    interface: content
+    content: solutions
+    target: $SNAP_COMMON/solutions

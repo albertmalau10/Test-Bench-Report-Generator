@@ -39,8 +39,8 @@ func ResetOpcConnection() {
 }
 
 func ensureClientCert() ([]byte, *rsa.PrivateKey, error) {
-	certFile := os.Getenv("OPCUA_CERT_PATH")
-	keyFile := os.Getenv("OPCUA_KEY_PATH")
+	certFile := "client_cert.pem"
+	keyFile := "client_key.pem"
 
 	certPEM, err1 := os.ReadFile(certFile)
 	keyPEM, err2 := os.ReadFile(keyFile)
@@ -91,11 +91,7 @@ func getPersistentClient(ctx context.Context, s models.Settings) (*opcua.Client,
 
 	// Use the persistent connection if it already exists
 	if opcClient != nil {
-		if isClientHealthy(ctx, opcClient) {
-			return opcClient, nil
-		}
-		opcClient.Close(ctx)
-		opcClient = nil
+		return opcClient, nil
 	}
 
 	if s.OpcUaAddress == "" {
@@ -185,7 +181,7 @@ func GetOpcData(db *gorm.DB) gin.HandlerFunc {
 				return nil
 			}
 			req := &ua.ReadRequest{
-				MaxAge:      2000,
+				MaxAge: 2000,
 				NodesToRead: []*ua.ReadValueID{{NodeID: id, AttributeID: ua.AttributeIDValue}},
 			}
 			res, err := client.Read(ctx, req)
@@ -305,14 +301,14 @@ func GetOpcStatus(db *gorm.DB) gin.HandlerFunc {
 				return gin.H{"connected": false, "value": "-"}
 			}
 			req := &ua.ReadRequest{
-				MaxAge:      2000,
+				MaxAge: 2000,
 				NodesToRead: []*ua.ReadValueID{{NodeID: id, AttributeID: ua.AttributeIDValue}},
 			}
 			res, err := client.Read(ctx, req)
 			if err != nil || len(res.Results) == 0 || res.Results[0].Status != ua.StatusOK {
 				return gin.H{"connected": false, "value": "-"}
 			}
-
+			
 			val := "-"
 			if res.Results[0].Value != nil {
 				val = fmt.Sprintf("%v", res.Results[0].Value.Value())
@@ -328,32 +324,4 @@ func GetOpcStatus(db *gorm.DB) gin.HandlerFunc {
 
 		c.JSON(http.StatusOK, status)
 	}
-}
-
-func isClientHealthy(ctx context.Context, client *opcua.Client) bool {
-
-	if client == nil {
-		return false
-	}
-
-	req := &ua.ReadRequest{
-		NodesToRead: []*ua.ReadValueID{
-			{
-				NodeID:      ua.NewNumericNodeID(0, 2258),
-				AttributeID: ua.AttributeIDValue,
-			},
-		},
-	}
-
-	resp, err := client.Read(ctx, req)
-
-	if err != nil {
-		return false
-	}
-
-	if len(resp.Results) == 0 {
-		return false
-	}
-
-	return resp.Results[0].Status == ua.StatusOK
 }

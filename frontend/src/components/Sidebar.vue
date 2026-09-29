@@ -97,7 +97,7 @@ function handleLogout() {
   padding: 0 1rem;
   font-weight: 700;
   font-size: 1.1rem;
-  color: var(--text-color);
+  color: var(--sidebar-text-active);
   border-bottom: 1px solid var(--border-color);
 }
 .menu {

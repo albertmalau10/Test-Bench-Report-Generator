@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { API_ORIGIN } from '../services/api'
 import { useRoute } from 'vue-router'
 import api from '../services/api'
 import { useValveStore } from '../stores/valve'
@@ -55,15 +56,13 @@ function openDatasheet() {
 const imageUrl = computed(() => {
   if (!valve.value?.image_path) return null
   if (valve.value.image_path.startsWith('http')) return valve.value.image_path
-  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080'
-  return `${baseUrl}${valve.value.image_path}`
+  return `${API_ORIGIN}${valve.value.image_path}`
 })
 
 const datasheetUrl = computed(() => {
   if (!valve.value?.datasheet_path) return null
   if (valve.value.datasheet_path.startsWith('http')) return valve.value.datasheet_path
-  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080'
-  return `${baseUrl}${valve.value.datasheet_path}`
+  return `${API_ORIGIN}${valve.value.datasheet_path}`
 })
 
 const feedback = {

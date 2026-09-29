@@ -25,7 +25,12 @@ repomix-output.xml
 # Go build
 *.exe
 *.out
-
+# TLS credentials (never commit)
 backend/client_cert.pem
 backend/client_key.pem
 *.pem
+
+# SQLite journal files
+*.db-shm
+*.db-wal
+*.bak-darktheme
