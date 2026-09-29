@@ -18,12 +18,6 @@ const routes = [
     component: LoginView
   },
   {
-  path: '/setting',
-  name: 'setting',
-  component: () => import('../views/SettingView.vue'),
-  meta: { requiresAuth: true, requiresAdmin: true }
-  },
-  {
     path: '/',
     component: MainLayout,
     meta: { requiresAuth: true },

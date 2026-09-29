@@ -42,6 +42,13 @@ func ensureClientCert() ([]byte, *rsa.PrivateKey, error) {
 	certFile := os.Getenv("OPCUA_CERT_PATH")
 	keyFile := os.Getenv("OPCUA_KEY_PATH")
 
+	if certFile == "" {
+		certFile = "./client_cert.pem"
+	}
+	if keyFile == "" {
+		keyFile = "./client_key.pem"
+	}
+
 	certPEM, err1 := os.ReadFile(certFile)
 	keyPEM, err2 := os.ReadFile(keyFile)
 	if err1 == nil && err2 == nil {

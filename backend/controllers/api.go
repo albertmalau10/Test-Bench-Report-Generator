@@ -1,15 +1,17 @@
 package controllers
 
-import(
-	"net/http"
+import (
 	"fmt"
-	"strings"
-	"path/filepath"
-	"time"
+	"mime/multipart"
+	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"valve_database/models"
 
 	"github.com/gin-gonic/gin"
-	"valve_database/models"
 	"gorm.io/gorm"
 )
 
@@ -145,6 +147,7 @@ func UploadValveImage(db *gorm.DB) gin.HandlerFunc {
 
 		// Extract and validate the file extension (Security Fix)
 		ext := strings.ToLower(filepath.Ext(file.Filename))
+
 		allowedExts := map[string]bool{
 			".jpg":  true,
 			".jpeg": true,
@@ -153,7 +156,30 @@ func UploadValveImage(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		if !allowedExts[ext] {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "format file tidak diizinkan. Gunakan JPG, PNG, atau WEBP."})
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "format file tidak diizinkan. Gunakan JPG, PNG, atau WEBP.",
+			})
+			return
+		}
+
+		mimeType, err := detectMimeType(file)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "gagal memeriksa file",
+			})
+			return
+		}
+
+		allowedMime := map[string]bool{
+			"image/jpeg": true,
+			"image/png":  true,
+			"image/webp": true,
+		}
+
+		if !allowedMime[mimeType] {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "MIME type tidak valid",
+			})
 			return
 		}
 
@@ -193,9 +219,27 @@ func UploadValveDatasheet(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		ext := filepath.Ext(file.Filename)
+		ext := strings.ToLower(filepath.Ext(file.Filename))
+
 		if ext != ".pdf" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "file harus berformat PDF"})
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "file harus berformat PDF",
+			})
+			return
+		}
+
+		mimeType, err := detectMimeType(file)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "gagal memeriksa file",
+			})
+			return
+		}
+
+		if mimeType != "application/pdf" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "file bukan PDF valid",
+			})
 			return
 		}
 
@@ -217,4 +261,22 @@ func UploadValveDatasheet(db *gorm.DB) gin.HandlerFunc {
 
 		c.JSON(http.StatusOK, valve)
 	}
+}
+
+func detectMimeType(fileHeader *multipart.FileHeader) (string, error) {
+
+	file, err := fileHeader.Open()
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	buffer := make([]byte, 512)
+
+	_, err = file.Read(buffer)
+	if err != nil {
+		return "", err
+	}
+
+	return http.DetectContentType(buffer), nil
 }

@@ -1,0 +1,5600 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+backend/
+  controllers/
+    api.go
+    auth.go
+    opcua.go
+    settings.go
+  database/
+    db.go
+  datasheets/
+    1_1788398421.pdf
+    2_1788398574.pdf
+    RE 29123_2023-03.pdf
+    re29088_2016-01 (1).pdf
+  images/
+    1_1788398421.jpg
+    2_1788346831.jpg
+    2_1788398574.jpg
+    test.jpg
+    valve-1.jpg
+    valve-2.jpg
+    valve-3.jpg
+    valve-4.jpg
+    valve-5.jpg
+  middleware/
+    jwt.go
+  models/
+    models.go
+    settings.go
+    users.go
+  utils/
+    password.go
+  Valve API/
+    .gitignore
+    API_collection.json
+  go.mod
+  main.go
+frontend/
+  public/
+    favicon.svg
+    icons.svg
+  src/
+    assets/
+      hero.png
+      logo.jpg
+      vite.svg
+      vue.svg
+    components/
+      Sidebar.vue
+      Topbar.vue
+    composables/
+      useTheme.js
+    layouts/
+      MainLayout.vue
+    router/
+      index.js
+    services/
+      api.js
+    stores/
+      auth.js
+      valve.js
+    views/
+      DashboardView.vue
+      LoginView.vue
+      RecordsView.vue
+      SettingView.vue
+      ValveDetailsView.vue
+      ValveListView.vue
+    App.vue
+    main.js
+    style.css
+  .gitignore
+  index.html
+  package.json
+  README.md
+  vite.config.js
+.gitignore
+README.md
+repomix_config.json
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="backend/controllers/auth.go">
+package controllers
+
+import (
+	"net/http"
+	"os"
+	"valve_database/models"
+	"valve_database/utils"
+
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
+	"gorm.io/gorm"
+)
+
+type RegisterInput struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required,min=6"`
+}
+
+func Register(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var input RegisterInput
+
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		hashedPassword, err := utils.HashPassword(input.Password)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to hash password"})
+			return
+		}
+
+		newUser := models.User{
+			Username: input.Username,
+			Password: hashedPassword,
+		}
+
+		if result := db.Create(&newUser); result.Error != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+			return
+		}
+
+		c.JSON(http.StatusCreated, newUser)
+	}
+}
+
+type LoginInput struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+func Login(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var input LoginInput
+
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		var user models.User
+		if result := db.Where("username = ?", input.Username).First(&user); result.Error != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid username or password"})
+			return
+		}
+
+		if !utils.CheckPasswordHash(input.Password, user.Password) {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid username or password"})
+			return
+		}
+
+		token, err := generateToken(user.ID, user.Username, user.Role)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"token": token,
+			"user": gin.H{
+				"id":       user.ID,
+				"username": user.Username,
+				"role":     user.Role,
+			},
+		})
+	}
+}
+
+func generateToken(userID uint, username string, role string) (string, error) {
+	claims := jwt.MapClaims{
+		"user_id":  userID,
+		"username": username,
+		"role":     role,
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(os.Getenv("JWT_SECRET")))
+}
+</file>
+
+<file path="backend/middleware/jwt.go">
+package middleware
+
+import (
+	"net/http"
+	"os"
+	"strings"
+
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
+)
+
+func AuthRequired() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "authorization header missing"})
+			c.Abort()
+			return
+		}
+
+		parts := strings.Split(authHeader, " ")
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authorization header format"})
+			c.Abort()
+			return
+		}
+		tokenString := parts[1]
+
+		token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
+			return []byte(os.Getenv("JWT_SECRET")), nil
+		})
+
+		if err != nil || !token.Valid {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
+			c.Abort()
+			return
+		}
+
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token claims"})
+			c.Abort()
+			return
+		}
+
+		c.Set("user_id", claims["user_id"])
+		c.Set("username", claims["username"])
+		c.Set("role", claims["role"])
+
+		c.Next()
+	}
+}
+
+func AdminOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role, exists := c.Get("role")
+		if !exists || role != "admin" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "admin access required"})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+</file>
+
+<file path="backend/models/models.go">
+package models
+
+type Valve struct {
+	ID           	uint    `json:"id" gorm:"primarykey"`
+	Manufacturer 	string  `json:"manufacturer"`
+	PartNumber   	string  `json:"part_number" gorm:"unique;not null"`
+	ComponentSeries string  `json:"component_series" gorm:"not null"`
+	ValveType    	string  `json:"valve_type" gorm:"not null"`    
+	Size_NG			int     `json:"size_ng"`    
+	Weight      	float64 `json:"weight"`
+	RatedFlow     	float64 `json:"rated_flow"`                   
+	MaxFlow   		float64 `json:"max_flow"`
+	CommandValue    float64 `json:"command_value"`
+	CommandType     string  `json:"command_type"`
+	MaxPressure  	float64 `json:"max_pressure"`
+	ImagePath       string  `json:"image_path"`   
+	DatasheetPath   string  `json:"datasheet_path"`                       
+}
+</file>
+
+<file path="backend/models/users.go">
+package models
+
+type User struct {
+	ID       uint   `json:"id" gorm:"primarykey"`
+	Username string `json:"username" gorm:"unique;not null"`
+	Password string `json:"-" gorm:"not null"`
+	Role     string `json:"role" gorm:"not null"` // "admin" or "operator"
+}
+</file>
+
+<file path="backend/utils/password.go">
+package utils
+
+import "golang.org/x/crypto/bcrypt"
+
+func HashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes), nil
+}
+
+func CheckPasswordHash(password, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
+}
+</file>
+
+<file path="backend/Valve API/.gitignore">
+# Secrets
+.env*
+
+# Dependencies
+node_modules
+
+# OS files
+.DS_Store
+Thumbs.db
+</file>
+
+<file path="frontend/public/favicon.svg">
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="46" fill="none" viewBox="0 0 48 46"><path fill="#863bff" d="M25.946 44.938c-.664.845-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.287c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.497 0-3.578-1.842-3.578H1.237c-.92 0-1.456-1.04-.92-1.788L10.013.474c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.579 1.842 3.579h11.377c.943 0 1.473 1.088.89 1.83L25.947 44.94z" style="fill:#863bff;fill:color(display-p3 .5252 .23 1);fill-opacity:1"/><mask id="a" width="48" height="46" x="0" y="0" maskUnits="userSpaceOnUse" style="mask-type:alpha"><path fill="#000" d="M25.842 44.938c-.664.844-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.183c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.498 0-3.579-1.842-3.579H1.133c-.92 0-1.456-1.04-.92-1.787L9.91.473c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.578 1.842 3.578h11.377c.943 0 1.473 1.088.89 1.832L25.843 44.94z" style="fill:#000;fill-opacity:1"/></mask><g mask="url(#a)"><g filter="url(#b)"><ellipse cx="5.508" cy="14.704" fill="#ede6ff" rx="5.508" ry="14.704" style="fill:#ede6ff;fill:color(display-p3 .9275 .9033 1);fill-opacity:1" transform="matrix(.00324 1 1 -.00324 -4.47 31.516)"/></g><g filter="url(#c)"><ellipse cx="10.399" cy="29.851" fill="#ede6ff" rx="10.399" ry="29.851" style="fill:#ede6ff;fill:color(display-p3 .9275 .9033 1);fill-opacity:1" transform="matrix(.00324 1 1 -.00324 -39.328 7.883)"/></g><g filter="url(#d)"><ellipse cx="5.508" cy="30.487" fill="#7e14ff" rx="5.508" ry="30.487" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(89.814 -25.913 -14.639)scale(1 -1)"/></g><g filter="url(#e)"><ellipse cx="5.508" cy="30.599" fill="#7e14ff" rx="5.508" ry="30.599" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(89.814 -32.644 -3.334)scale(1 -1)"/></g><g filter="url(#f)"><ellipse cx="5.508" cy="30.599" fill="#7e14ff" rx="5.508" ry="30.599" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="matrix(.00324 1 1 -.00324 -34.34 30.47)"/></g><g filter="url(#g)"><ellipse cx="14.072" cy="22.078" fill="#ede6ff" rx="14.072" ry="22.078" style="fill:#ede6ff;fill:color(display-p3 .9275 .9033 1);fill-opacity:1" transform="rotate(93.35 24.506 48.493)scale(-1 1)"/></g><g filter="url(#h)"><ellipse cx="3.47" cy="21.501" fill="#7e14ff" rx="3.47" ry="21.501" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(89.009 28.708 47.59)scale(-1 1)"/></g><g filter="url(#i)"><ellipse cx="3.47" cy="21.501" fill="#7e14ff" rx="3.47" ry="21.501" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(89.009 28.708 47.59)scale(-1 1)"/></g><g filter="url(#j)"><ellipse cx=".387" cy="8.972" fill="#7e14ff" rx="4.407" ry="29.108" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(39.51 .387 8.972)"/></g><g filter="url(#k)"><ellipse cx="47.523" cy="-6.092" fill="#7e14ff" rx="4.407" ry="29.108" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(37.892 47.523 -6.092)"/></g><g filter="url(#l)"><ellipse cx="41.412" cy="6.333" fill="#47bfff" rx="5.971" ry="9.665" style="fill:#47bfff;fill:color(display-p3 .2799 .748 1);fill-opacity:1" transform="rotate(37.892 41.412 6.333)"/></g><g filter="url(#m)"><ellipse cx="-1.879" cy="38.332" fill="#7e14ff" rx="4.407" ry="29.108" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(37.892 -1.88 38.332)"/></g><g filter="url(#n)"><ellipse cx="-1.879" cy="38.332" fill="#7e14ff" rx="4.407" ry="29.108" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(37.892 -1.88 38.332)"/></g><g filter="url(#o)"><ellipse cx="35.651" cy="29.907" fill="#7e14ff" rx="4.407" ry="29.108" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(37.892 35.651 29.907)"/></g><g filter="url(#p)"><ellipse cx="38.418" cy="32.4" fill="#47bfff" rx="5.971" ry="15.297" style="fill:#47bfff;fill:color(display-p3 .2799 .748 1);fill-opacity:1" transform="rotate(37.892 38.418 32.4)"/></g></g><defs><filter id="b" width="60.045" height="41.654" x="-19.77" y="16.149" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="7.659"/></filter><filter id="c" width="90.34" height="51.437" x="-54.613" y="-7.533" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="7.659"/></filter><filter id="d" width="79.355" height="29.4" x="-49.64" y="2.03" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="e" width="79.579" height="29.4" x="-45.045" y="20.029" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="f" width="79.579" height="29.4" x="-43.513" y="21.178" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="g" width="74.749" height="58.852" x="15.756" y="-17.901" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="7.659"/></filter><filter id="h" width="61.377" height="25.362" x="23.548" y="2.284" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="i" width="61.377" height="25.362" x="23.548" y="2.284" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="j" width="56.045" height="63.649" x="-27.636" y="-22.853" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="k" width="54.814" height="64.646" x="20.116" y="-38.415" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="l" width="33.541" height="35.313" x="24.641" y="-11.323" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="m" width="54.814" height="64.646" x="-29.286" y="6.009" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="n" width="54.814" height="64.646" x="-29.286" y="6.009" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="o" width="54.814" height="64.646" x="8.244" y="-2.416" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="p" width="39.409" height="43.623" x="18.713" y="10.588" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter></defs></svg>
+</file>
+
+<file path="frontend/public/icons.svg">
+<svg xmlns="http://www.w3.org/2000/svg">
+  <symbol id="bluesky-icon" viewBox="0 0 16 17">
+    <g clip-path="url(#bluesky-clip)"><path fill="#08060d" d="M7.75 7.735c-.693-1.348-2.58-3.86-4.334-5.097-1.68-1.187-2.32-.981-2.74-.79C.188 2.065.1 2.812.1 3.251s.241 3.602.398 4.13c.52 1.744 2.367 2.333 4.07 2.145-2.495.37-4.71 1.278-1.805 4.512 3.196 3.309 4.38-.71 4.987-2.746.608 2.036 1.307 5.91 4.93 2.746 2.72-2.746.747-4.143-1.747-4.512 1.702.189 3.55-.4 4.07-2.145.156-.528.397-3.691.397-4.13s-.088-1.186-.575-1.406c-.42-.19-1.06-.395-2.741.79-1.755 1.24-3.64 3.752-4.334 5.099"/></g>
+    <defs><clipPath id="bluesky-clip"><path fill="#fff" d="M.1.85h15.3v15.3H.1z"/></clipPath></defs>
+  </symbol>
+  <symbol id="discord-icon" viewBox="0 0 20 19">
+    <path fill="#08060d" d="M16.224 3.768a14.5 14.5 0 0 0-3.67-1.153c-.158.286-.343.67-.47.976a13.5 13.5 0 0 0-4.067 0c-.128-.306-.317-.69-.476-.976A14.4 14.4 0 0 0 3.868 3.77C1.546 7.28.916 10.703 1.231 14.077a14.7 14.7 0 0 0 4.5 2.306q.545-.748.965-1.587a9.5 9.5 0 0 1-1.518-.74q.191-.14.372-.293c2.927 1.369 6.107 1.369 8.999 0q.183.152.372.294-.723.437-1.52.74.418.838.963 1.588a14.6 14.6 0 0 0 4.504-2.308c.37-3.911-.63-7.302-2.644-10.309m-9.13 8.234c-.878 0-1.599-.82-1.599-1.82 0-.998.705-1.82 1.6-1.82.894 0 1.614.82 1.599 1.82.001 1-.705 1.82-1.6 1.82m5.91 0c-.878 0-1.599-.82-1.599-1.82 0-.998.705-1.82 1.6-1.82.893 0 1.614.82 1.599 1.82 0 1-.706 1.82-1.6 1.82"/>
+  </symbol>
+  <symbol id="documentation-icon" viewBox="0 0 21 20">
+    <path fill="none" stroke="#aa3bff" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.35" d="m15.5 13.333 1.533 1.322c.645.555.967.833.967 1.178s-.322.623-.967 1.179L15.5 18.333m-3.333-5-1.534 1.322c-.644.555-.966.833-.966 1.178s.322.623.966 1.179l1.534 1.321"/>
+    <path fill="none" stroke="#aa3bff" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.35" d="M17.167 10.836v-4.32c0-1.41 0-2.117-.224-2.68-.359-.906-1.118-1.621-2.08-1.96-.599-.21-1.349-.21-2.848-.21-2.623 0-3.935 0-4.983.369-1.684.591-3.013 1.842-3.641 3.428C3 6.449 3 7.684 3 10.154v2.122c0 2.558 0 3.838.706 4.726q.306.383.713.671c.76.536 1.79.64 3.581.66"/>
+    <path fill="none" stroke="#aa3bff" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.35" d="M3 10a2.78 2.78 0 0 1 2.778-2.778c.555 0 1.209.097 1.748-.047.48-.129.854-.503.982-.982.145-.54.048-1.194.048-1.749a2.78 2.78 0 0 1 2.777-2.777"/>
+  </symbol>
+  <symbol id="github-icon" viewBox="0 0 19 19">
+    <path fill="#08060d" fill-rule="evenodd" d="M9.356 1.85C5.05 1.85 1.57 5.356 1.57 9.694a7.84 7.84 0 0 0 5.324 7.44c.387.079.528-.168.528-.376 0-.182-.013-.805-.013-1.454-2.165.467-2.616-.935-2.616-.935-.349-.91-.864-1.143-.864-1.143-.71-.48.051-.48.051-.48.787.051 1.2.805 1.2.805.695 1.194 1.817.857 2.268.649.064-.507.27-.857.49-1.052-1.728-.182-3.545-.857-3.545-3.87 0-.857.31-1.558.8-2.104-.078-.195-.349-1 .077-2.078 0 0 .657-.208 2.14.805a7.5 7.5 0 0 1 1.946-.26c.657 0 1.328.092 1.946.26 1.483-1.013 2.14-.805 2.14-.805.426 1.078.155 1.883.078 2.078.502.546.799 1.247.799 2.104 0 3.013-1.818 3.675-3.558 3.87.284.247.528.714.528 1.454 0 1.052-.012 1.896-.012 2.156 0 .208.142.455.528.377a7.84 7.84 0 0 0 5.324-7.441c.013-4.338-3.48-7.844-7.773-7.844" clip-rule="evenodd"/>
+  </symbol>
+  <symbol id="social-icon" viewBox="0 0 20 20">
+    <path fill="none" stroke="#aa3bff" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.35" d="M12.5 6.667a4.167 4.167 0 1 0-8.334 0 4.167 4.167 0 0 0 8.334 0"/>
+    <path fill="none" stroke="#aa3bff" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.35" d="M2.5 16.667a5.833 5.833 0 0 1 8.75-5.053m3.837.474.513 1.035c.07.144.257.282.414.309l.93.155c.596.1.736.536.307.965l-.723.73a.64.64 0 0 0-.152.531l.207.903c.164.715-.213.991-.84.618l-.872-.52a.63.63 0 0 0-.577 0l-.872.52c-.624.373-1.003.094-.84-.618l.207-.903a.64.64 0 0 0-.152-.532l-.723-.729c-.426-.43-.289-.864.306-.964l.93-.156a.64.64 0 0 0 .412-.31l.513-1.034c.28-.562.735-.562 1.012 0"/>
+  </symbol>
+  <symbol id="x-icon" viewBox="0 0 19 19">
+    <path fill="#08060d" fill-rule="evenodd" d="M1.893 1.98c.052.072 1.245 1.769 2.653 3.77l2.892 4.114c.183.261.333.48.333.486s-.068.089-.152.183l-.522.593-.765.867-3.597 4.087c-.375.426-.734.834-.798.905a1 1 0 0 0-.118.148c0 .01.236.017.664.017h.663l.729-.83c.4-.457.796-.906.879-.999a692 692 0 0 0 1.794-2.038c.034-.037.301-.34.594-.675l.551-.624.345-.392a7 7 0 0 1 .34-.374c.006 0 .93 1.306 2.052 2.903l2.084 2.965.045.063h2.275c1.87 0 2.273-.003 2.266-.021-.008-.02-1.098-1.572-3.894-5.547-2.013-2.862-2.28-3.246-2.273-3.266.008-.019.282-.332 2.085-2.38l2-2.274 1.567-1.782c.022-.028-.016-.03-.65-.03h-.674l-.3.342a871 871 0 0 1-1.782 2.025c-.067.075-.405.458-.75.852a100 100 0 0 1-.803.91c-.148.172-.299.344-.99 1.127-.304.343-.32.358-.345.327-.015-.019-.904-1.282-1.976-2.808L6.365 1.85H1.8zm1.782.91 8.078 11.294c.772 1.08 1.413 1.973 1.425 1.984.016.017.241.02 1.05.017l1.03-.004-2.694-3.766L7.796 5.75 5.722 2.852l-1.039-.004-1.039-.004z" clip-rule="evenodd"/>
+  </symbol>
+</svg>
+</file>
+
+<file path="frontend/src/assets/vite.svg">
+<svg xmlns="http://www.w3.org/2000/svg" width="77" height="47" fill="none" aria-labelledby="vite-logo-title" viewBox="0 0 77 47"><title id="vite-logo-title">Vite</title><style>.parenthesis{fill:#000}@media (prefers-color-scheme:dark){.parenthesis{fill:#fff}}</style><path fill="#9135ff" d="M40.151 45.71c-.663.844-2.02.374-2.02-.699V34.708a2.26 2.26 0 0 0-2.262-2.262H24.493c-.92 0-1.457-1.04-.92-1.788l7.479-10.471c1.07-1.498 0-3.578-1.842-3.578H15.443c-.92 0-1.456-1.04-.92-1.788l9.696-13.576c.213-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.472c-1.07 1.497 0 3.578 1.842 3.578h11.376c.944 0 1.474 1.087.89 1.83L40.153 45.712z"/><mask id="a" width="48" height="47" x="14" y="0" maskUnits="userSpaceOnUse" style="mask-type:alpha"><path fill="#000" d="M40.047 45.71c-.663.843-2.02.374-2.02-.699V34.708a2.26 2.26 0 0 0-2.262-2.262H24.389c-.92 0-1.457-1.04-.92-1.788l7.479-10.472c1.07-1.497 0-3.578-1.842-3.578H15.34c-.92 0-1.456-1.04-.92-1.788l9.696-13.575c.213-.297.556-.474.92-.474H53.93c.92 0 1.456 1.04.92 1.788L47.37 13.03c-1.07 1.498 0 3.578 1.842 3.578h11.376c.944 0 1.474 1.088.89 1.831L40.049 45.712z"/></mask><g mask="url(#a)"><g filter="url(#b)"><ellipse cx="5.508" cy="14.704" fill="#eee6ff" rx="5.508" ry="14.704" transform="rotate(269.814 20.96 11.29)scale(-1 1)"/></g><g filter="url(#c)"><ellipse cx="10.399" cy="29.851" fill="#eee6ff" rx="10.399" ry="29.851" transform="rotate(89.814 -16.902 -8.275)scale(1 -1)"/></g><g filter="url(#d)"><ellipse cx="5.508" cy="30.487" fill="#8900ff" rx="5.508" ry="30.487" transform="rotate(89.814 -19.197 -7.127)scale(1 -1)"/></g><g filter="url(#e)"><ellipse cx="5.508" cy="30.599" fill="#8900ff" rx="5.508" ry="30.599" transform="rotate(89.814 -25.928 4.177)scale(1 -1)"/></g><g filter="url(#f)"><ellipse cx="5.508" cy="30.599" fill="#8900ff" rx="5.508" ry="30.599" transform="rotate(89.814 -25.738 5.52)scale(1 -1)"/></g><g filter="url(#g)"><ellipse cx="14.072" cy="22.078" fill="#eee6ff" rx="14.072" ry="22.078" transform="rotate(93.35 31.245 55.578)scale(-1 1)"/></g><g filter="url(#h)"><ellipse cx="3.47" cy="21.501" fill="#8900ff" rx="3.47" ry="21.501" transform="rotate(89.009 35.419 55.202)scale(-1 1)"/></g><g filter="url(#i)"><ellipse cx="3.47" cy="21.501" fill="#8900ff" rx="3.47" ry="21.501" transform="rotate(89.009 35.419 55.202)scale(-1 1)"/></g><g filter="url(#j)"><ellipse cx="14.592" cy="9.743" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(39.51 14.592 9.743)"/></g><g filter="url(#k)"><ellipse cx="61.728" cy="-5.321" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(37.892 61.728 -5.32)"/></g><g filter="url(#l)"><ellipse cx="55.618" cy="7.104" fill="#00c2ff" rx="5.971" ry="9.665" transform="rotate(37.892 55.618 7.104)"/></g><g filter="url(#m)"><ellipse cx="12.326" cy="39.103" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(37.892 12.326 39.103)"/></g><g filter="url(#n)"><ellipse cx="12.326" cy="39.103" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(37.892 12.326 39.103)"/></g><g filter="url(#o)"><ellipse cx="49.857" cy="30.678" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(37.892 49.857 30.678)"/></g><g filter="url(#p)"><ellipse cx="52.623" cy="33.171" fill="#00c2ff" rx="5.971" ry="15.297" transform="rotate(37.892 52.623 33.17)"/></g></g><path d="M6.919 0c-9.198 13.166-9.252 33.575 0 46.789h6.215c-9.25-13.214-9.196-33.623 0-46.789zm62.424 0h-6.215c9.198 13.166 9.252 33.575 0 46.789h6.215c9.25-13.214 9.196-33.623 0-46.789" class="parenthesis"/><defs><filter id="b" width="60.045" height="41.654" x="-5.564" y="16.92" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="7.659"/></filter><filter id="c" width="90.34" height="51.437" x="-40.407" y="-6.762" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="7.659"/></filter><filter id="d" width="79.355" height="29.4" x="-35.435" y="2.801" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="e" width="79.579" height="29.4" x="-30.84" y="20.8" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="f" width="79.579" height="29.4" x="-29.307" y="21.949" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="g" width="74.749" height="58.852" x="29.961" y="-17.13" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="7.659"/></filter><filter id="h" width="61.377" height="25.362" x="37.754" y="3.055" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="i" width="61.377" height="25.362" x="37.754" y="3.055" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="j" width="56.045" height="63.649" x="-13.43" y="-22.082" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="k" width="54.814" height="64.646" x="34.321" y="-37.644" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="l" width="33.541" height="35.313" x="38.847" y="-10.552" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="m" width="54.814" height="64.646" x="-15.081" y="6.78" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="n" width="54.814" height="64.646" x="-15.081" y="6.78" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="o" width="54.814" height="64.646" x="22.45" y="-1.645" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="p" width="39.409" height="43.623" x="32.919" y="11.36" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter></defs></svg>
+</file>
+
+<file path="frontend/src/assets/vue.svg">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="37.07" height="36" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 198"><path fill="#41B883" d="M204.8 0H256L128 220.8L0 0h97.92L128 51.2L157.44 0h47.36Z"></path><path fill="#41B883" d="m0 0l128 220.8L256 0h-51.2L128 132.48L50.56 0H0Z"></path><path fill="#35495E" d="M50.56 0L128 133.12L204.8 0h-47.36L128 51.2L97.92 0H50.56Z"></path></svg>
+</file>
+
+<file path="frontend/src/components/Sidebar.vue">
+<script setup>
+import { ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useTheme } from '../composables/useTheme'
+import { useAuthStore } from '../stores/auth'
+
+const { isDark, toggleTheme } = useTheme()
+
+defineProps({
+  collapsed: { type: Boolean, default: false }
+})
+
+const route = useRoute()
+const router = useRouter()
+const authStore = useAuthStore()
+
+function handleLogout() {
+  authStore.logout()
+  router.push({ name: 'login' })
+}
+</script>
+
+<template>
+  <aside class="sidebar" :class="{ collapsed }">
+    <div class="logo">
+      <i class="pi pi-microchip"></i>
+      <span v-if="!collapsed">Test Bench Report Generator</span>
+    </div>
+
+    <nav class="menu">
+      <router-link to="/" class="menu-item" exact-active-class="active">
+        <i class="pi pi-home"></i>
+        <span v-if="!collapsed">Dashboard</span>
+      </router-link>
+
+      <router-link to="/valves" class="menu-item" active-class="active">
+        <i class="pi pi-list"></i>
+        <span v-if="!collapsed">Valve List</span>
+      </router-link>
+
+      <router-link
+        :to="{ name: 'valve-details-search' }"
+        class="menu-item"
+        :class="{ active: route.name === 'valve-details-search' || route.name === 'valve-details' }"
+      >
+        <i class="pi pi-info-circle"></i>
+        <span v-if="!collapsed">Valve Details</span>
+      </router-link>
+
+      <router-link to="/records" class="menu-item" active-class="active">
+        <i class="pi pi-database"></i>
+        <span v-if="!collapsed">Records</span>
+      </router-link>
+
+      <router-link to="/settings" class="menu-item" active-class="active" v-if="authStore.user?.role === 'admin'">
+        <i class="pi pi-cog"></i>
+        <span v-if="!collapsed">Settings</span>
+      </router-link>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="menu-item" @click="toggleTheme">
+        <i :class="isDark ? 'pi pi-sun' : 'pi pi-moon'"></i>
+        <span v-if="!collapsed">{{ isDark ? 'Light Mode' : 'Dark Mode' }}</span>
+      </button>
+      <button class="menu-item" @click="handleLogout">
+        <i class="pi pi-sign-out"></i>
+        <span v-if="!collapsed">Logout</span>
+      </button>
+    </div>
+  </aside>
+</template>
+
+<style scoped>
+.sidebar {
+  width: 240px;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  transition: width 0.2s ease;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+}
+.sidebar.collapsed {
+  width: 64px;
+}
+.logo {
+  height: 64px;
+  min-height: 64px;
+  max-height: 64px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 1rem;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--sidebar-text-active);
+  border-bottom: 1px solid var(--border-color);
+}
+.menu {
+  flex: 1;
+  padding: 0.75rem 0.5rem;
+  overflow-y: auto;
+}
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  color: var(--sidebar-text);
+  text-decoration: none;
+  background: none;
+  border: none;
+  font-size: 0.95rem;
+  cursor: pointer;
+  text-align: left;
+}
+.menu-item:hover {
+  background: var(--sidebar-active-bg);
+}
+.menu-item.active {
+  background: var(--sidebar-active-bg);
+  color: var(--sidebar-text-active);
+  font-weight: 600;
+}
+.toggle-icon {
+  margin-left: auto;
+  transition: transform 0.2s;
+  font-size: 0.75rem;
+}
+.toggle-icon.open {
+  transform: rotate(180deg);
+}
+.submenu {
+  display: flex;
+  flex-direction: column;
+  padding-left: 2.2rem;
+}
+.submenu-item {
+  padding: 0.5rem 0.5rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.9rem;
+  border-radius: 6px;
+}
+.submenu-item:hover {
+  background: var(--sidebar-active-bg);
+}
+.submenu-item.active {
+  color: var(--sidebar-text-active);
+  font-weight: 600;
+}
+.sidebar-footer {
+  padding: 0.75rem 0.5rem;
+  border-top: 1px solid var(--border-color);
+}
+</style>
+</file>
+
+<file path="frontend/src/components/Topbar.vue">
+<script setup>
+import { computed } from 'vue'
+import { useAuthStore } from '../stores/auth'
+
+defineEmits(['toggle-sidebar'])
+
+const authStore = useAuthStore()
+
+const roleLabel = computed(() => {
+  const role = authStore.user?.role
+  if (!role) return ''
+  return role.charAt(0).toUpperCase() + role.slice(1)
+})
+</script>
+
+<template>
+  <header class="topbar">
+    <button class="icon-btn" @click="$emit('toggle-sidebar')">
+      <i class="pi pi-bars"></i>
+    </button>
+
+    <div class="topbar-right">
+      <button class="icon-btn">
+        <i class="pi pi-bell"></i>
+      </button>
+      <div class="profile">
+        <i class="pi pi-user-circle"></i>
+        <span>{{ roleLabel }}</span>
+      </div>
+    </div>
+  </header>
+</template>
+
+<style scoped>
+.topbar {
+  height: 64px;
+  min-height: 64px;
+  max-height: 64px;
+  flex-shrink: 0;
+  flex-grow: 0;
+  box-sizing: border-box;
+  background: var(--topbar-bg);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.25rem;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.icon-btn {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  color: var(--sidebar-text);
+  cursor: pointer;
+  padding: 0.4rem;
+  border-radius: 6px;
+}
+.icon-btn:hover {
+  background: var(--sidebar-active-bg);
+}
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.profile {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--sidebar-text-active);
+  font-weight: 500;
+}
+.profile i {
+  font-size: 1.6rem;
+}
+</style>
+</file>
+
+<file path="frontend/src/composables/useTheme.js">
+import { ref } from 'vue'
+
+
+const isDark = ref(false)
+
+function applyTheme() {
+  const root = document.documentElement
+  if (isDark.value) {
+    root.classList.add('p-dark')
+  } else {
+    root.classList.remove('p-dark')
+  }
+  localStorage.setItem('theme', isDark.value ? 'dark' : 'light')
+}
+
+function initTheme() {
+  const saved = localStorage.getItem('theme')
+  if (saved) {
+    isDark.value = saved === 'dark'
+  } else {
+    isDark.value = window.matchMedia('(prefers-color-scheme: dark)').matches
+  }
+  applyTheme()
+}
+
+function toggleTheme() {
+  isDark.value = !isDark.value
+  applyTheme()
+}
+
+export function useTheme() {
+  return { isDark, initTheme, toggleTheme }
+}
+</file>
+
+<file path="frontend/src/layouts/MainLayout.vue">
+<script setup>
+import { ref } from 'vue'
+import Sidebar from '../components/Sidebar.vue'
+import Topbar from '../components/Topbar.vue'
+
+const sidebarCollapsed = ref(true)
+</script>
+
+<template>
+  <div class="main-layout">
+    <Sidebar :collapsed="sidebarCollapsed" />
+    <div class="content-area">
+      <Topbar @toggle-sidebar="sidebarCollapsed = !sidebarCollapsed" />
+      <main class="page-content">
+        <router-view />
+      </main>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.main-layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+.content-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+.page-content {
+  flex: 1;
+  padding: 1.5rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+</style>
+</file>
+
+<file path="frontend/src/stores/auth.js">
+import { defineStore } from 'pinia'
+import api from '../services/api' 
+
+export const useAuthStore = defineStore('auth', {
+  state: () => ({
+    token: sessionStorage.getItem('token') || null,
+    user: JSON.parse(sessionStorage.getItem('user')) || null
+  }),
+  getters: {
+    isLoggedIn: (state) => !!state.token,
+    isAdmin: (state) => state.user?.role === 'admin'
+  },
+  actions: {
+    async login(username, password) {
+      const response = await api.post('/login', { username, password })
+      const { token, user } = response.data
+
+      this.token = token
+      this.user = user
+
+      sessionStorage.setItem('token', token)
+      sessionStorage.setItem('user', JSON.stringify(user))
+    },
+    logout() {
+      this.token = null
+      this.user = null
+
+      sessionStorage.removeItem('token')
+      sessionStorage.removeItem('user')
+    }
+  }
+})
+</file>
+
+<file path="frontend/src/stores/valve.js">
+import { defineStore } from 'pinia'
+
+export const useValveStore = defineStore('valve', {
+  state: () => ({
+    selectedValve: null
+  }),
+  actions: {
+    selectValve(valve) {
+      this.selectedValve = valve
+    }
+  }
+})
+</file>
+
+<file path="frontend/src/views/LoginView.vue">
+<template>
+  <main class="login-page">
+    <section class="login-shell">
+      <!-- System identity -->
+      <aside class="system-panel">
+        <div class="system-brand">
+          <div class="logo-frame">
+            <img
+              :src="logo"
+              alt="Test Bench Report Generator"
+              class="brand-logo"
+            />
+          </div>
+
+          <div class="brand-copy">
+            <span class="brand-label">APPLICATION</span>
+            <strong>Test Bench Report Generator</strong>
+          </div>
+        </div>
+
+        <div class="system-content">
+          <p class="section-index">01 / ACCESS</p>
+
+          <h1>Engineering test data and report management.</h1>
+
+          <p class="system-description">
+            Authorized access for hydraulic valve testing, data recording,
+            and report generation.
+          </p>
+
+          <dl class="system-information">
+            <div class="information-row">
+              <dt>System</dt>
+              <dd>Test Bench Platform</dd>
+            </div>
+
+            <div class="information-row">
+              <dt>Interface</dt>
+              <dd>Web Application</dd>
+            </div>
+
+            <div class="information-row">
+              <dt>Access</dt>
+              <dd>
+                <span class="status-indicator"></span>
+                Restricted
+              </dd>
+            </div>
+          </dl>
+        </div>
+
+        <div class="system-footer">
+          <span>Internal Engineering Tool</span>
+          <span>v1.0</span>
+        </div>
+      </aside>
+
+      <!-- Authentication form -->
+      <section class="form-panel">
+        <div class="mobile-brand">
+          <div class="logo-frame mobile-logo">
+            <img
+              :src="logo"
+              alt="Test Bench Report Generator"
+              class="brand-logo"
+            />
+          </div>
+
+          <div class="brand-copy">
+            <span class="brand-label">APPLICATION</span>
+            <strong>Test Bench Report Generator</strong>
+          </div>
+        </div>
+
+        <div class="login-form-container">
+          <header class="form-header">
+            <span class="form-code">AUTH / 01</span>
+            <h2>Sign in</h2>
+            <p>Enter your assigned account credentials.</p>
+          </header>
+
+          <form
+            class="login-form"
+            novalidate
+            @submit.prevent="handleLogin"
+          >
+            <div class="field">
+              <label for="username">Username</label>
+
+              <div class="control-wrapper">
+                <i class="pi pi-user control-icon"></i>
+
+                <InputText
+                  id="username"
+                  v-model.trim="username"
+                  type="text"
+                  autocomplete="username"
+                  placeholder="Enter username"
+                  :disabled="isLoading"
+                  :invalid="Boolean(fieldErrors.username)"
+                  class="text-control"
+                  autofocus
+                  @input="clearError('username')"
+                />
+              </div>
+
+              <small
+                v-if="fieldErrors.username"
+                class="field-error"
+              >
+                {{ fieldErrors.username }}
+              </small>
+            </div>
+
+            <div class="field">
+              <label for="password">Password</label>
+
+              <div class="control-wrapper">
+                <i class="pi pi-lock control-icon"></i>
+
+                <Password
+                  v-model="password"
+                  inputId="password"
+                  autocomplete="current-password"
+                  placeholder="Enter password"
+                  :feedback="false"
+                  :disabled="isLoading"
+                  :invalid="Boolean(fieldErrors.password)"
+                  toggleMask
+                  class="password-control"
+                  inputClass="password-input"
+                  @input="clearError('password')"
+                />
+              </div>
+
+              <small
+                v-if="fieldErrors.password"
+                class="field-error"
+              >
+                {{ fieldErrors.password }}
+              </small>
+            </div>
+
+            <div
+              v-if="errorMessage"
+              class="authentication-error"
+              role="alert"
+            >
+              <i class="pi pi-exclamation-triangle"></i>
+
+              <div>
+                <strong>Authentication failed</strong>
+                <span>{{ errorMessage }}</span>
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              label="Continue"
+              icon="pi pi-arrow-right"
+              iconPos="right"
+              :loading="isLoading"
+              :disabled="isLoading"
+              class="login-button"
+            />
+          </form>
+
+          <footer class="form-footer">
+            <i class="pi pi-shield"></i>
+            <span>Authorized personnel only</span>
+          </footer>
+        </div>
+      </section>
+    </section>
+  </main>
+</template>
+
+<script setup>
+import { reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
+
+import logo from '../assets/logo.jpg'
+
+import InputText from 'primevue/inputtext'
+import Password from 'primevue/password'
+import Button from 'primevue/button'
+
+const username = ref('')
+const password = ref('')
+const errorMessage = ref('')
+const isLoading = ref(false)
+
+const fieldErrors = reactive({
+  username: '',
+  password: ''
+})
+
+const authStore = useAuthStore()
+const router = useRouter()
+
+function validateForm() {
+  fieldErrors.username = ''
+  fieldErrors.password = ''
+  errorMessage.value = ''
+
+  if (!username.value.trim()) {
+    fieldErrors.username = 'Username is required.'
+  }
+
+  if (!password.value) {
+    fieldErrors.password = 'Password is required.'
+  }
+
+  return !fieldErrors.username && !fieldErrors.password
+}
+
+function clearError(fieldName) {
+  fieldErrors[fieldName] = ''
+  errorMessage.value = ''
+}
+
+async function handleLogin() {
+  if (!validateForm()) {
+    return
+  }
+
+  isLoading.value = true
+  errorMessage.value = ''
+
+  try {
+    await authStore.login(
+      username.value.trim(),
+      password.value
+    )
+
+    await router.push('/')
+  } catch (err) {
+    if (!err.response) {
+      errorMessage.value =
+        'Unable to connect to the backend server.'
+    } else if (err.response.status === 401) {
+      errorMessage.value =
+        'Incorrect username or password.'
+    } else {
+      errorMessage.value =
+        err.response?.data?.error ||
+        'An unexpected error occurred.'
+    }
+  } finally {
+    isLoading.value = false
+  }
+}
+</script>
+
+<style scoped>
+.login-page {
+  width: 100%;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  color: var(--text-primary);
+  background-color: var(--bg-main);
+  background-image:
+    linear-gradient(
+      rgba(0, 43, 73, 0.035) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      rgba(0, 43, 73, 0.035) 1px,
+      transparent 1px
+    );
+  background-size: 32px 32px;
+}
+
+.login-shell {
+  width: min(100%, 960px);
+  min-height: 610px;
+  display: grid;
+  grid-template-columns: 42% 58%;
+  overflow: hidden;
+  background: var(--bg-card);
+  border: 1px solid var(--stopped);
+  border-radius: 4px;
+  box-shadow: 0 24px 60px rgba(0, 43, 73, 0.14);
+}
+
+/* Left system panel */
+
+.system-panel {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 2.25rem;
+  background: var(--bosch-blue);
+  border-right: 1px solid var(--bosch-blue-2);
+}
+
+.system-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.logo-frame {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid var(--bosch-blue-2);
+  border-radius: 3px;
+}
+
+.brand-logo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.brand-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+}
+
+/* Brand text sits on two different backgrounds: the navy
+   system-panel (desktop) and the white form-panel (mobile, <760px,
+   see .mobile-brand below) — each needs its own contrast pair
+   rather than one shared color. */
+.system-brand .brand-label {
+  color: var(--stopped);
+  font-family: Consolas, Monaco, monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+}
+
+.system-brand .brand-copy strong {
+  color: #ffffff;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.mobile-brand .brand-label {
+  color: var(--text-secondary);
+  font-family: Consolas, Monaco, monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+}
+
+.mobile-brand .brand-copy strong {
+  color: var(--text-primary);
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.system-content {
+  margin: auto 0;
+  padding: 3rem 0;
+}
+
+.section-index {
+  margin: 0 0 1rem;
+  color: var(--info);
+  font-family: Consolas, Monaco, monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+}
+
+.system-content h1 {
+  max-width: 22rem;
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(2rem, 3.2vw, 2.8rem);
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+}
+
+.system-description {
+  max-width: 21rem;
+  margin: 1.25rem 0 0;
+  color: var(--stopped);
+  font-size: 0.86rem;
+  line-height: 1.75;
+}
+
+.system-information {
+  margin: 2.6rem 0 0;
+  border-top: 1px solid var(--bosch-blue-2);
+}
+
+.information-row {
+  display: grid;
+  grid-template-columns: 6rem 1fr;
+  min-height: 2.7rem;
+  align-items: center;
+  border-bottom: 1px solid var(--bosch-blue-2);
+}
+
+.information-row dt {
+  color: var(--stopped);
+  font-family: Consolas, Monaco, monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.information-row dd {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.48rem;
+  color: #ffffff;
+  font-size: 0.78rem;
+}
+
+.status-indicator {
+  width: 7px;
+  height: 7px;
+  background: var(--info);
+  border-radius: 50%;
+}
+
+.system-footer {
+  display: flex;
+  justify-content: space-between;
+  color: var(--stopped);
+  font-family: Consolas, Monaco, monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+}
+
+/* Right form panel */
+
+.form-panel {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3.5rem;
+  background: #ffffff;
+}
+
+.mobile-brand {
+  display: none;
+}
+
+.login-form-container {
+  width: 100%;
+  max-width: 340px;
+}
+
+.form-header {
+  margin-bottom: 2.25rem;
+}
+
+.form-code {
+  margin: 0 0 0.85rem;
+  color: var(--bosch-blue-2);
+  font-family: Consolas, Monaco, monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+}
+
+.form-header h2 {
+  margin: 0 0 0.5rem;
+  color: var(--text-primary);
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.form-header p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+  line-height: 1.6;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.35rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.48rem;
+}
+
+.field label {
+  color: var(--text-primary);
+  font-size: 0.77rem;
+  font-weight: 600;
+}
+
+.control-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.control-icon {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 0.95rem;
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.control-wrapper:focus-within .control-icon {
+  color: var(--info);
+}
+
+.text-control {
+  width: 100%;
+}
+
+.control-wrapper :deep(.p-inputtext),
+.control-wrapper :deep(.password-input) {
+  width: 100%;
+  height: 46px;
+  padding-left: 2.65rem;
+  color: var(--text-primary);
+  background: #ffffff;
+  border: 1px solid var(--stopped);
+  border-radius: 3px;
+  font-size: 0.85rem;
+  box-shadow: none;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.control-wrapper :deep(.p-inputtext::placeholder),
+.control-wrapper :deep(.password-input::placeholder) {
+  color: var(--text-secondary);
+}
+
+.control-wrapper :deep(.p-inputtext:hover),
+.control-wrapper :deep(.password-input:hover) {
+  border-color: var(--bosch-blue-2);
+}
+
+.control-wrapper :deep(.p-inputtext:focus),
+.control-wrapper :deep(.password-input:focus) {
+  background: #ffffff;
+  border-color: var(--info);
+  box-shadow: 0 0 0 2px rgba(0, 200, 247, 0.16);
+}
+
+.control-wrapper :deep(.p-invalid) {
+  border-color: var(--alarm-high);
+}
+
+.password-control {
+  width: 100%;
+}
+
+.password-control :deep(.p-password) {
+  width: 100%;
+}
+
+.password-control :deep(.password-input) {
+  padding-right: 2.8rem;
+}
+
+.password-control :deep(.p-password-toggle-mask-icon) {
+  color: var(--text-secondary);
+}
+
+.field-error {
+  color: var(--alarm-high);
+  font-size: 0.7rem;
+}
+
+.authentication-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.85rem;
+  color: #8a2020;
+  background: #fdecec;
+  border-left: 3px solid var(--alarm-high);
+  border-radius: 2px;
+}
+
+.authentication-error > i {
+  margin-top: 0.12rem;
+  color: var(--alarm-high);
+  font-size: 0.85rem;
+}
+
+.authentication-error > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.authentication-error strong {
+  color: var(--alarm-high);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.authentication-error span {
+  color: #8a2020;
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.login-button {
+  width: 100%;
+  height: 46px;
+  margin-top: 0.2rem;
+  display: flex;
+  justify-content: space-between;
+  color: var(--bosch-blue);
+  background: var(--info);
+  border: 1px solid var(--info);
+  border-radius: 3px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  box-shadow: none;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.login-button:not(:disabled):hover {
+  background: #33d6ff;
+  border-color: #33d6ff;
+}
+
+.login-button:not(:disabled):active {
+  background: #00a8d1;
+  border-color: #00a8d1;
+}
+
+.form-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 1.5rem;
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+}
+
+.form-footer i {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+
+/* Responsive */
+
+@media (max-width: 760px) {
+  .login-page {
+    display: block;
+    min-height: 100vh;
+    padding: 0;
+    overflow-y: auto;
+  }
+
+  .login-shell {
+    display: block;
+    min-height: 100vh;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .system-panel {
+    display: none;
+  }
+
+  .form-panel {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 2rem;
+  }
+
+  .mobile-brand {
+    width: 100%;
+    max-width: 340px;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin-bottom: 3.5rem;
+  }
+
+  .mobile-logo {
+    width: 38px;
+    height: 38px;
+  }
+}
+
+@media (max-width: 420px) {
+  .form-panel {
+    justify-content: flex-start;
+    padding: 1.5rem;
+  }
+
+  .mobile-brand {
+    margin: 1rem 0 4rem;
+  }
+
+  .form-header h2 {
+    font-size: 1.55rem;
+  }
+}
+</style>
+</file>
+
+<file path="frontend/src/views/ValveListView.vue">
+<script setup>
+import { ref, reactive, onMounted } from 'vue'
+import api from '../services/api'
+import { FilterMatchMode } from '@primevue/core/api'
+import FileUpload from 'primevue/fileupload'
+import { uploadValveImage, uploadValveDatasheet } from '../services/api'
+
+
+import DataTable from 'primevue/datatable'
+import Column from 'primevue/column'
+import Button from 'primevue/button'
+import Dialog from 'primevue/dialog'
+import InputText from 'primevue/inputtext'
+import InputNumber from 'primevue/inputnumber'
+import ConfirmDialog from 'primevue/confirmdialog'
+import { useConfirm } from 'primevue/useconfirm'
+import Toast from 'primevue/toast'
+import { useToast } from 'primevue/usetoast'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
+import { useRouter } from 'vue-router'
+import { useValveStore } from '../stores/valve'
+import { useAuthStore } from '../stores/auth'
+
+const router = useRouter()
+const valveStore = useValveStore()
+const authStore = useAuthStore()
+
+function viewDetail(valve) {
+  valveStore.selectValve(valve)
+  router.push({ name: 'valve-details', params: { id: valve.id } })
+}
+
+const toast = useToast()
+const confirm = useConfirm()
+
+const valves = ref([])
+const loading = ref(true)
+const filters = ref({
+  global: { value: null, matchMode: FilterMatchMode.CONTAINS }
+})
+const dialogVisible = ref(false)
+const selectedFile = ref(null)
+
+function onFileSelect(event) {
+  selectedFile.value = event.files[0]
+}
+
+const selectedDatasheetFile = ref(null)
+
+function onDatasheetSelect(event) {
+  selectedDatasheetFile.value = event.files[0]
+}
+
+const editingId = ref(null)
+
+const emptyForm = {
+  manufacturer: '',
+  part_number: '',
+  component_series: '',
+  valve_type: '',
+  size_ng: null,
+  weight: null,
+  rated_flow: null,
+  max_flow: null,
+  command_value: null,
+  command_type: '',
+  max_pressure: null
+}
+
+const form = reactive({ ...emptyForm })
+
+const errors = reactive({})
+
+function validateForm() {
+  Object.keys(errors).forEach(key => delete errors[key])
+
+  if (!form.manufacturer?.trim()) errors.manufacturer = 'Manufacturer is required'
+  if (!form.part_number?.trim()) errors.part_number = 'Part Number is required'
+  if (!form.component_series?.trim()) errors.component_series = 'Component Series is required'
+  if (!form.valve_type?.trim()) errors.valve_type = 'Valve Type is required'
+  if (form.size_ng === null || form.size_ng === undefined) errors.size_ng = 'Size NG is required'
+  if (form.max_pressure === null || form.max_pressure === undefined) errors.max_pressure = 'Max Pressure is required'
+
+  return Object.keys(errors).length === 0
+}
+
+async function fetchValves() {
+  try {
+    loading.value = true
+    const response = await api.get('/valves')
+    console.log('DATA VALVE:', response.data)
+    valves.value = response.data
+  } catch (error) {
+    console.error('Failed to fetch valve data:', error)
+  } finally {
+    loading.value = false
+  }
+}
+
+function openCreateDialog() {
+  editingId.value = null
+  Object.assign(form, emptyForm)
+  Object.keys(errors).forEach(key => delete errors[key])
+  selectedFile.value = null
+  selectedDatasheetFile.value = null
+  dialogVisible.value = true
+}
+
+function openEditDialog(valve) {
+  editingId.value = valve.id
+  Object.assign(form, valve) 
+  Object.keys(errors).forEach(key => delete errors[key])
+  selectedFile.value = null
+  selectedDatasheetFile.value = null
+  dialogVisible.value = true
+}
+
+async function handleSubmit() {
+  if (!validateForm()) {
+    toast.add({ severity: 'warn', summary: 'the Form is Incomplete', detail: 'Please recheck the required fields', life: 3000 })
+    return
+  }
+
+  try {
+    let valveId = editingId.value
+
+    if (editingId.value) {
+      await api.put(`/valves/${editingId.value}`, form)
+    } else {
+      const response = await api.post('/valves', form)
+      valveId = response.data.id
+    }
+
+    if (selectedFile.value) {
+      await uploadValveImage(valveId, selectedFile.value)
+    }
+
+    if (selectedDatasheetFile.value) {           
+      await uploadValveDatasheet(valveId, selectedDatasheetFile.value)
+    }
+
+    toast.add({ severity: 'success', summary: 'Successful', detail: 'Valve successfully saved', life: 3000 })
+    dialogVisible.value = false
+    await fetchValves()
+  } catch (error) {
+    console.error('Failed to save valve:', error)
+    toast.add({ severity: 'error', summary: 'Failed', detail: 'An error occurred while saving the data', life: 3000 })
+  }
+}
+
+function confirmDelete(valve) {
+  confirm.require({
+    message: `Are you sure you want to delete the "${valve.part_number}" valve ?`,
+    header: 'Delete Confirmation',
+    icon: 'pi pi-exclamation-triangle',
+    acceptLabel: 'Delete',
+    rejectLabel: 'Cancel',
+    acceptClass: 'p-button-danger',
+    accept: async () => {
+      try {
+        await api.delete(`/valves/${valve.id}`)
+        toast.add({ severity: 'success', summary: 'Success', detail: 'Valve was successfully removed', life: 3000 })
+        await fetchValves()
+      } catch (error) {
+        console.error('Failed to delete Valve:', error)
+        toast.add({ severity: 'error', summary: 'Failed', detail: 'An error occurred while deleting the data', life: 3000 })
+      }
+    }
+  })
+}
+
+onMounted(() => {
+  fetchValves()
+})
+</script>
+
+<template>
+  <div class="valve-list-page">
+    <Toast />
+    <ConfirmDialog />
+
+    <div class="page-header">
+      <h2 class="page-title"></h2>
+      <Button v-if="authStore.isAdmin" label="Add Valve" icon="pi pi-plus" @click="openCreateDialog" />
+    </div>
+
+    <DataTable
+      :value="valves"
+      :loading="loading"
+      stripedRows
+      v-model:filters="filters"
+      filterDisplay="menu"
+      :globalFilterFields="['manufacturer', 'part_number', 'component_series', 'valve_type']"
+      paginator
+      :rows="5"
+      :rowsPerPageOptions="[5, 10, 20, 50]"
+      sortMode="multiple"
+      scrollable
+      scrollHeight="flex"
+      class="valve-table"
+    >
+      <template #header>
+        <div class="table-header">
+          <IconField>
+            <InputIcon class="pi pi-search" />
+            <InputText v-model="filters.global.value" placeholder="Search Valve..." />
+          </IconField>
+        </div>
+      </template>
+
+      <Column field="id" header="ID" sortable />
+      <Column field="manufacturer" header="Manufacturer" sortable />
+      <Column field="part_number" header="Part Number" sortable />
+      <Column field="component_series" header="Series" sortable />
+      <Column field="valve_type" header="Type" sortable />
+      <Column field="size_ng" header="Size NG" sortable />
+      <Column field="weight" header="Weight" sortable />
+      <Column field="rated_flow" header="Rated Flow" sortable />
+      <Column field="max_flow" header="Max Flow" sortable />
+      <Column field="command_value" header="Command Value" sortable />
+      <Column field="command_type" header="Command Type" sortable />
+      <Column field="max_pressure" header="Max Pressure" sortable />
+      <Column header="Action" :exportable="false" style="min-width: 10rem">
+        <template #body="slotProps">
+          <Button icon="pi pi-eye" severity="info" text @click="viewDetail(slotProps.data)" />
+          <Button icon="pi pi-pencil" severity="secondary" text @click="openEditDialog(slotProps.data)" />
+          <Button v-if="authStore.isAdmin" icon="pi pi-trash" severity="danger" text @click="confirmDelete(slotProps.data)" />
+        </template>
+      </Column>
+    </DataTable>
+
+    <Dialog v-model:visible="dialogVisible" :header="editingId ? 'Edit Valve' : 'Tambah Valve'" :modal="true" :style="{ width: '30rem' }">
+      <div style="display: flex; flex-direction: column; gap: 1rem;">
+        <div>
+          <label>Manufacturer</label>
+          <InputText v-model="form.manufacturer" :invalid="!!errors.manufacturer" style="width: 100%" />
+          <small v-if="errors.manufacturer" style="color: var(--p-red-500)">{{ errors.manufacturer }}</small>
+        </div>
+        <div>
+          <label>Part Number</label>
+          <InputText v-model="form.part_number" :invalid="!!errors.part_number" style="width: 100%" />
+          <small v-if="errors.part_number" style="color: var(--p-red-500)">{{ errors.part_number }}</small>
+        </div>
+        <div>
+          <label>Component Series</label>
+          <InputText v-model="form.component_series" :invalid="!!errors.component_series" style="width: 100%" />
+          <small v-if="errors.component_series" style="color: var(--p-red-500)">{{ errors.component_series }}</small>
+        </div>
+        <div>
+          <label>Valve Type</label>
+          <InputText v-model="form.valve_type" :invalid="!!errors.valve_type" style="width: 100%" />
+          <small v-if="errors.valve_type" style="color: var(--p-red-500)">{{ errors.valve_type }}</small>
+        </div>
+        <div>
+          <label>Size NG</label>
+          <InputNumber v-model="form.size_ng" :invalid="!!errors.size_ng" style="width: 100%" />
+          <small v-if="errors.size_ng" style="color: var(--p-red-500)">{{ errors.size_ng }}</small>
+        </div>
+        <div>
+          <label>Weight</label>
+          <InputNumber v-model="form.weight" :minFractionDigits="0" :maxFractionDigits="2" style="width: 100%" />
+        </div>
+        <div>
+          <label>Rated Flow</label>
+          <InputNumber v-model="form.rated_flow" :minFractionDigits="0" :maxFractionDigits="2" style="width: 100%" />
+        </div>
+        <div>
+          <label>Max Flow</label>
+          <InputNumber v-model="form.max_flow" :minFractionDigits="0" :maxFractionDigits="2" style="width: 100%" />
+        </div>
+        <div>
+          <label>Command Value</label>
+          <InputNumber v-model="form.command_value" :minFractionDigits="0" :maxFractionDigits="2" style="width: 100%" />
+        </div>
+        <div>
+          <label>Command Type</label>
+          <InputText v-model="form.command_type" style="width: 100%" />
+        </div>
+        <div>
+          <label>Max Pressure</label>
+          <InputNumber v-model="form.max_pressure" :invalid="!!errors.max_pressure" :minFractionDigits="0" :maxFractionDigits="2" style="width: 100%" />
+          <small v-if="errors.max_pressure" style="color: var(--p-red-500)">{{ errors.max_pressure }}</small>
+        </div>
+        <div v-if="authStore.isAdmin">
+          <label>Valve Image</label>
+          <FileUpload
+            mode="basic"
+            name="image"
+            accept="image/*"
+            :maxFileSize="2000000"
+            chooseLabel="Choose Image"
+            :auto="false"
+            customUpload
+            @select="onFileSelect"
+          />
+        </div>
+        <div v-if="authStore.isAdmin">
+          <label>Datasheet (PDF)</label>
+          <FileUpload
+            mode="basic"
+            name="datasheet"
+            accept="application/pdf"
+            :maxFileSize="5000000"
+            chooseLabel="Choose PDF"
+            :auto="false"
+            customUpload
+            @select="onDatasheetSelect"
+          />
+        </div>
+      </div>
+
+      <template #footer>
+        <Button label="Cancel" severity="secondary" @click="dialogVisible = false" />
+        <Button label="Save" @click="handleSubmit" />
+      </template>
+    </Dialog>
+  </div>
+</template>
+
+<style scoped>
+.valve-list-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-shrink: 0;
+}
+
+.page-title {
+  color: #323638;
+  font-size: 2rem;
+  font-weight: 700;
+  font-family: 'Segoe UI', sans-serif;
+  margin: 0;
+}
+
+.valve-table {
+  flex: 1;
+  min-height: 0;
+}
+
+.table-header {
+  display: flex;
+  justify-content: flex-end;
+}
+</style>
+</file>
+
+<file path="frontend/src/App.vue">
+<script setup>
+import { onMounted } from 'vue'
+import Toast from 'primevue/toast'
+import { useTheme } from './composables/useTheme'
+
+const { initTheme } = useTheme()
+onMounted(() => {
+  initTheme()
+})
+</script>
+
+<template>
+  <div class="app-container">
+    <Toast />
+    <router-view />
+  </div>
+</template>
+
+<style scoped>
+.app-container {
+  height: 100vh;
+  overflow: hidden;
+}
+</style>
+</file>
+
+<file path="frontend/src/main.js">
+import { createApp } from 'vue'
+import { createPinia } from 'pinia'
+import './style.css'
+import App from './App.vue'
+import router from './router'
+
+import PrimeVue from 'primevue/config'
+import Aura from '@primevue/themes/aura'
+import ConfirmationService from 'primevue/confirmationservice'
+import ToastService from 'primevue/toastservice'
+import 'primeicons/primeicons.css'
+
+const app = createApp(App)
+
+app.use(PrimeVue, {
+  theme: {
+    preset: Aura,
+    options: {
+      darkModeSelector: '.p-dark'
+    }
+  }
+})
+app.use(ConfirmationService)
+app.use(ToastService)
+app.use(createPinia())
+app.use(router)
+
+app.mount('#app')
+</file>
+
+<file path="frontend/src/style.css">
+/* ============================================================
+   Valve Database App — color theme
+   Repainted to the Bosch Rexroth / ISA-101 high-performance HMI
+   palette: muted, low-saturation backgrounds and status colors,
+   with color reserved for genuine abnormal conditions (alarms) —
+   not for routine "everything is fine" indicators. See the color
+   reference sheet delivered alongside this change for the full
+   swatch + hex + usage table.
+   ============================================================ */
+:root {
+  /* --- Bosch Rexroth base palette --- */
+  --rexroth-1: #A3BAC8;
+  --rexroth-2: #506E81;
+  --rexroth-3: #002B49;
+  --rexroth-4: #ED0007;
+  --rexroth-5: #91F0FF;
+  --rexroth-6: #00C8F7;
+
+  /* --- ISA-101 semantic tokens --- */
+  --bg-main: #D8DEE3;
+  --bg-panel: #C5D0D8;
+  --bg-card: #EEF1F3;
+
+  --bosch-blue: #002B49;
+  --bosch-blue-2: #506E81;
+
+  --normal: #6F7A80;
+  --stopped: #A3BAC8;
+  --out-of-service: #C9CED1;
+
+  --alarm-high: #ED0007;
+  --alarm-medium: #FF8C00;
+  --alarm-warning: #FFD000;
+
+  --info: #00C8F7;
+
+  --text-primary: #1E1E1E;
+  --text-secondary: #4D4D4D;
+
+  /* --- Trend chart roles (RecordsView) --- */
+  --trend-actual: var(--bosch-blue);
+  --trend-setpoint: var(--info);
+  --trend-warning-limit: var(--alarm-warning);
+  --trend-alarm-limit: var(--alarm-high);
+
+  /* --- Legacy variable names kept so existing components need no
+     changes — all aliased onto the ISA-101 tokens above. Sidebar/
+     topbar map onto the Navigation/Header roles (Top Header +
+     Navigation Active), not onto a plain white theme. --- */
+  --bg-color: var(--bg-main);
+  --sidebar-bg: var(--bosch-blue);
+  --sidebar-text: var(--stopped);
+  --sidebar-text-active: #FFFFFF;
+  --sidebar-active-bg: var(--bosch-blue-2);
+  --topbar-bg: var(--bosch-blue);
+  --card-bg: var(--bg-card);
+  --text-color: var(--text-primary);
+  --text-color-secondary: var(--text-secondary);
+  --text-muted: var(--text-secondary);
+  --border-color: var(--stopped);
+  --primary-color: var(--bosch-blue-2);
+}
+
+/* ISA-101 is a fixed, muted industrial scheme by design — a
+   dark/night mode works against its purpose (reduced saturation so
+   real alarms stand out). The light/dark toggle in useTheme.js is
+   left in place (harmless), but .p-dark intentionally resolves to
+   the SAME tokens instead of an inverted dark palette. Flagged to
+   Rami — if a genuine dark/night variant is wanted later, it should
+   still use muted, desaturated colors, not the old slate-blue dark
+   theme this replaced. */
+.p-dark {
+  --bg-color: var(--bg-main);
+  --sidebar-bg: var(--bosch-blue);
+  --sidebar-text: var(--stopped);
+  --sidebar-text-active: #FFFFFF;
+  --sidebar-active-bg: var(--bosch-blue-2);
+  --topbar-bg: var(--bosch-blue);
+  --card-bg: var(--bg-card);
+  --text-color: var(--text-primary);
+  --text-muted: var(--text-secondary);
+  --border-color: var(--stopped);
+  --primary-color: var(--bosch-blue-2);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+}
+
+html, body, #app {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+.brand-logo {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+</file>
+
+<file path="frontend/.gitignore">
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+</file>
+
+<file path="frontend/index.html">
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Test Bench Report Generator</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
+</file>
+
+<file path="frontend/package.json">
+{
+  "name": "valve_database_frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@primevue/themes": "^4.5.4",
+    "axios": "^1.19.0",
+    "chart.js": "^4.5.1",
+    "pinia": "^4.0.3",
+    "primeflex": "^4.0.0",
+    "primeicons": "^8.0.0",
+    "primevue": "^4.5.5",
+    "vue": "^3.5.40",
+    "vue-chartjs": "^5.3.4",
+    "vue-router": "^4.6.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.8",
+    "vite": "^8.2.0"
+  }
+}
+</file>
+
+<file path="frontend/README.md">
+# Vue 3 + Vite
+
+This template should help get you started developing with Vue 3 in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+
+Learn more about IDE Support for Vue in the [Vue Docs Scaling up Guide](https://vuejs.org/guide/scaling-up/tooling.html#ide-support).
+</file>
+
+<file path="frontend/vite.config.js">
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+
+// VITE_BASE_PATH is set by packaging/build-frontend.sh to
+// "/valve-database-app/" for the ctrlX CORE build, so every asset URL
+// and Vue Router link resolves correctly behind ctrlX's reverse
+// proxy. Local `npm run dev` / `npm run build` without that env var
+// keeps the default "/".
+// https://vite.dev/config/
+export default defineConfig({
+  base: process.env.VITE_BASE_PATH || '/',
+  plugins: [vue()],
+  server: {
+    // api.js calls relative "<BASE_URL>api/..." paths (e.g. "/api/valves")
+    // so the same code works unchanged behind ctrlX CORE's reverse proxy.
+    // This proxy makes that work for `npm run dev` too, forwarding to the
+    // Go backend (`go run .` in backend/, default :8080) without needing
+    // VITE_API_URL or backend CORS at all.
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+    },
+  },
+})
+</file>
+
+<file path="README.md">
+# Test Bench App
+
+Web-based application for generating, managing, and exporting valve test bench reports.
+
+## Features
+
+- User authentication
+- Valve master data management
+- Test report generation
+- Datasheet management
+- Image management
+- System settings configuration
+
+## Technology Stack
+
+### Backend
+- Go
+- Gin Framework
+- GORM
+- SQLite
+
+### Frontend
+- Vue.js
+- Vite
+- JavaScript
+
+## Project Structure
+
+```text
+backend/
+frontend/
+```
+
+## Backend Setup
+
+```bash
+cd backend
+
+go mod download
+
+go run main.go
+```
+
+## Frontend Setup
+
+```bash
+cd frontend
+
+npm install
+
+npm run dev
+```
+
+## Environment Variables
+
+Create file:
+
+```text
+backend/.env
+```
+
+Example:
+
+```env
+PORT=8080
+```
+
+Update the values according to your environment.
+
+## Database
+
+This application uses SQLite.
+
+Database tables are created automatically through GORM AutoMigrate when the application starts.
+
+## Notes
+
+- `.env` is not included in the repository.
+- SQLite database file is not included in the repository.
+- Frontend dependencies are installed using `npm install`.
+</file>
+
+<file path="repomix_config.json">
+{
+  "output": {
+    "filePath": "repomix-output.xml",
+    "style": "xml"
+  },
+  "ignore": {
+    "customPatterns": [
+      "**/node_modules/**",
+      "**/datasheets/**",
+      "**/images/**",
+      "**/*.db",
+      "**/package-lock.json",
+      "**/go.sum",
+      "**/.git/**",
+      "**/.vscode/**"
+    ]
+  }
+}
+</file>
+
+<file path="backend/Valve API/API_collection.json">
+{
+  "info": {
+    "name": "Valve API",
+    "description": "Converted from Bruno Collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "GET /ping",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/ping",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["ping"]
+        }
+      }
+    },
+    {
+      "name": "POST /login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/login",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["login"]
+        }
+      }
+    },
+    {
+      "name": "GET /valves",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/valves",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["valves"]
+        }
+      }
+    },
+    {
+      "name": "POST /valves",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"manufacturer\": \"Bosch Rexroth\",\n  \"part_number\": \"RE 29010\",\n  \"component_series\": \"5X\",\n  \"valve_type\": \"5WRLE\",\n  \"size_ng\": 16,\n  \"weight\": 18,\n  \"rated_flow\": 210,\n  \"max_flow\": 320,\n  \"command_value\": 24,\n  \"command_type\": \"volt\",\n  \"max_pressure\": 420\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/valves",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["valves"]
+        }
+      }
+    },
+    {
+      "name": "GET /valves/:id",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/valves/2",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["valves", "2"]
+        }
+      }
+    },
+    {
+      "name": "PUT /valves/:id",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"manufacturer\": \"Bosch Rexroth\",\n  \"part_number\": \"RE 29124\",\n  \"component_series\": \"3X\",\n  \"valve_type\": \"4WRLE\",\n  \"size_ng\": 16,\n  \"weight\": 12,\n  \"rated_flow\": 200,\n  \"max_flow\": 800.5,\n  \"supply_voltage\": 24,\n  \"max_pressure\": 350  \n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/valves/1",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["valves", "1"]
+        }
+      }
+    },
+    {
+      "name": "DELETE /valves/:id",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/valves/2",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["valves", "2"]
+        }
+      }
+    },
+    {
+      "name": "POST /valves/:id/image",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "image",
+              "type": "file",
+              "src": []
+            }
+          ]
+        },
+        "url": {
+          "raw": "http://localhost:8080/valves/1/image",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["valves", "1", "image"]
+        }
+      }
+    },
+    {
+      "name": "POST /valves/:id/datasheet",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "datasheet",
+              "type": "file",
+              "src": []
+            }
+          ]
+        },
+        "url": {
+          "raw": "http://localhost:8080/valves/1/datasheet",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["valves", "1", "datasheet"]
+        }
+      }
+    },
+    {
+      "name": "GET /settings",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/settings",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["settings"]
+        }
+      }
+    },
+    {
+      "name": "PUT /settings",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"modbus_server_address\": \"127.0.0.1:502\",\n  \"ctrlx_host\": \"127.0.0.1:8443\",\n  \"ctrlx_username\": \"boschrexroth\",\n  \"ctrlx_password\": \"boschrexroth\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/settings",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["settings"]
+        }
+      }
+    },
+    {
+      "name": "GET /token (ctrlX State)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{ctrlx_token}}"
+          }
+        ],
+        "url": {
+          "raw": "https://127.0.0.1:8443/automation/api/v2/nodes/framework/state",
+          "protocol": "https",
+          "host": ["127", "0", "0", "1"],
+          "port": "8443",
+          "path": ["automation", "api", "v2", "nodes", "framework", "state"]
+        }
+      }
+    }
+  ]
+}
+</file>
+
+<file path="backend/controllers/api.go">
+package controllers
+
+import (
+	"fmt"
+	"mime/multipart"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"valve_database/models"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+)
+
+func Ping(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"message": "ping",
+	})
+}
+
+func CreateValve(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var newValve models.Valve
+
+		if err := c.ShouldBindJSON(&newValve); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		if result := db.Create(&newValve); result.Error != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+			return
+		}
+
+		c.JSON(http.StatusCreated, newValve)
+	}
+}
+
+func GetValves(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var valves []models.Valve
+
+		if result := db.Find(&valves); result.Error != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, valves)
+	}
+}
+
+func GetValveByID(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+
+		var v models.Valve
+
+		result := db.First(&v, id)
+		if result.Error == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "valve tidak ditemukan"})
+			return
+		} else if result.Error != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, v)
+	}
+}
+
+// backend/controllers/api.go
+func UpdateValve(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+
+		var valve models.Valve
+		if result := db.First(&valve, id); result.Error != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "valve tidak ditemukan"})
+			return
+		}
+
+		var updatedValve models.Valve
+		if err := c.ShouldBindJSON(&updatedValve); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		valve.Manufacturer = updatedValve.Manufacturer
+		valve.PartNumber = updatedValve.PartNumber
+		valve.ComponentSeries = updatedValve.ComponentSeries
+		valve.ValveType = updatedValve.ValveType
+		valve.Size_NG = updatedValve.Size_NG
+		valve.Weight = updatedValve.Weight
+		valve.RatedFlow = updatedValve.RatedFlow
+		valve.MaxFlow = updatedValve.MaxFlow
+		valve.CommandValue = updatedValve.CommandValue
+		valve.CommandType = updatedValve.CommandType
+		valve.MaxPressure = updatedValve.MaxPressure
+
+		db.Save(&valve)
+
+		c.JSON(http.StatusOK, valve)
+	}
+}
+func DeleteValve(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+
+		var valve models.Valve
+		if result := db.First(&valve, id); result.Error != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "valve tidak ditemukan"})
+			return
+		}
+
+		// Remove associated files from disk
+		if valve.ImagePath != "" {
+			os.Remove(strings.TrimPrefix(valve.ImagePath, "/"))
+		}
+		if valve.DatasheetPath != "" {
+			os.Remove(strings.TrimPrefix(valve.DatasheetPath, "/"))
+		}
+
+		db.Delete(&valve)
+
+		c.JSON(http.StatusOK, gin.H{"message": "valve berhasil dihapus"})
+	}
+}
+
+func UploadValveImage(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+
+		var valve models.Valve
+		if result := db.First(&valve, id); result.Error != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "valve tidak ditemukan"})
+			return
+		}
+
+		file, err := c.FormFile("image")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "file gambar tidak ditemukan"})
+			return
+		}
+
+		// Extract and validate the file extension (Security Fix)
+		ext := strings.ToLower(filepath.Ext(file.Filename))
+
+		allowedExts := map[string]bool{
+			".jpg":  true,
+			".jpeg": true,
+			".png":  true,
+			".webp": true,
+		}
+
+		if !allowedExts[ext] {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "format file tidak diizinkan. Gunakan JPG, PNG, atau WEBP.",
+			})
+			return
+		}
+
+		mimeType, err := detectMimeType(file)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "gagal memeriksa file",
+			})
+			return
+		}
+
+		allowedMime := map[string]bool{
+			"image/jpeg": true,
+			"image/png":  true,
+			"image/webp": true,
+		}
+
+		if !allowedMime[mimeType] {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "MIME type tidak valid",
+			})
+			return
+		}
+
+		// Remove old image if it exists before saving the new one
+		if valve.ImagePath != "" {
+			os.Remove(strings.TrimPrefix(valve.ImagePath, "/"))
+		}
+
+		newFileName := fmt.Sprintf("%s_%d%s", id, time.Now().Unix(), ext)
+		savePath := filepath.Join("images", newFileName)
+
+		if err := c.SaveUploadedFile(file, savePath); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal menyimpan file"})
+			return
+		}
+
+		valve.ImagePath = "/images/" + newFileName
+		db.Save(&valve)
+
+		c.JSON(http.StatusOK, valve)
+	}
+}
+
+func UploadValveDatasheet(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+
+		var valve models.Valve
+		if result := db.First(&valve, id); result.Error != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "valve tidak ditemukan"})
+			return
+		}
+
+		file, err := c.FormFile("datasheet")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "file datasheet tidak ditemukan"})
+			return
+		}
+
+		ext := strings.ToLower(filepath.Ext(file.Filename))
+
+		if ext != ".pdf" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "file harus berformat PDF",
+			})
+			return
+		}
+
+		// MIME validation
+		uploadedFile, err := file.Open()
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "gagal membaca file",
+			})
+			return
+		}
+		defer uploadedFile.Close()
+
+		buffer := make([]byte, 512)
+
+		_, err = uploadedFile.Read(buffer)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "gagal memeriksa file",
+			})
+			return
+		}
+
+		mimeType, err := detectMimeType(file)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "gagal memeriksa file",
+			})
+			return
+		}
+
+		if mimeType != "application/pdf" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "file bukan PDF valid",
+			})
+			return
+		}
+
+		// Remove old datasheet if it exists before saving the new one
+		if valve.DatasheetPath != "" {
+			os.Remove(strings.TrimPrefix(valve.DatasheetPath, "/"))
+		}
+
+		newFileName := fmt.Sprintf("%s_%d%s", id, time.Now().Unix(), ext)
+		savePath := filepath.Join("datasheets", newFileName)
+
+		if err := c.SaveUploadedFile(file, savePath); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal menyimpan file"})
+			return
+		}
+
+		valve.DatasheetPath = "/datasheets/" + newFileName
+		db.Save(&valve)
+
+		c.JSON(http.StatusOK, valve)
+	}
+}
+
+func detectMimeType(fileHeader *multipart.FileHeader) (string, error) {
+
+	file, err := fileHeader.Open()
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	buffer := make([]byte, 512)
+
+	_, err = file.Read(buffer)
+	if err != nil {
+		return "", err
+	}
+
+	return http.DetectContentType(buffer), nil
+}
+</file>
+
+<file path="backend/controllers/settings.go">
+package controllers
+
+import (
+	"net/http"
+	"valve_database/models"
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+)
+
+func GetSettings(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var s models.Settings
+		db.FirstOrCreate(&s, models.Settings{ID: 1})
+		c.JSON(http.StatusOK, s)
+	}
+}
+
+func UpdateSettings(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var s models.Settings
+		if err := db.FirstOrCreate(&s, models.Settings{ID: 1}).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal load settings: " + err.Error()})
+			return
+		}
+
+		var input struct {
+			OpcUaAddress        string `json:"opc_ua_address"`
+			OpcNodePressure     string `json:"opc_node_pressure"`
+			OpcNodeCommand      string `json:"opc_node_command"`
+			OpcNodeFeedback     string `json:"opc_node_feedback"`
+			OpcNodeFlow         string `json:"opc_node_flow"`
+			OpcNodeOutput       string `json:"opc_node_output"`
+			OpcUaUsername       string `json:"opc_ua_username"`
+			OpcUaPassword       string `json:"opc_ua_password"`
+			OpcUaSecurityPolicy string `json:"opc_ua_security_policy"`
+			OpcUaSecurityMode   string `json:"opc_ua_security_mode"`
+		}
+
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		s.OpcUaAddress = input.OpcUaAddress
+		s.OpcNodePressure = input.OpcNodePressure
+		s.OpcNodeCommand = input.OpcNodeCommand
+		s.OpcNodeFeedback = input.OpcNodeFeedback
+		s.OpcNodeFlow = input.OpcNodeFlow
+		s.OpcNodeOutput = input.OpcNodeOutput
+		s.OpcUaUsername = input.OpcUaUsername
+		s.OpcUaSecurityPolicy = input.OpcUaSecurityPolicy
+		s.OpcUaSecurityMode = input.OpcUaSecurityMode
+
+		if input.OpcUaPassword != "" {
+			s.OpcUaPassword = input.OpcUaPassword
+		}
+
+		if err := db.Save(&s).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal simpan settings: " + err.Error()})
+			return
+		}
+		ResetOpcConnection()
+		c.JSON(http.StatusOK, s)
+	}
+}
+</file>
+
+<file path="backend/database/db.go">
+package database
+
+import (
+	"log"
+	"os"
+
+	"valve_database/models"
+	"valve_database/utils"
+
+	"github.com/glebarez/sqlite"
+	"gorm.io/gorm"
+)
+
+func ConnectDB() *gorm.DB{
+	dbPath := os.Getenv("DB_PATH")
+	if dbPath == "" {
+		dbPath = "./data.db"
+	}
+
+	db, err := gorm.Open(sqlite.Open(dbPath+"?_pragma=journal_mode(WAL)"), &gorm.Config{})
+	if err != nil {
+		log.Fatal("gagal terhubung ke database:", err)
+	}
+
+	sqlDB, err := db.DB()
+	if err == nil {
+		sqlDB.SetMaxOpenConns(1)
+	}
+
+	if err = db.AutoMigrate(&models.Valve{}, &models.User{}, &models.Settings{}); err != nil {
+		log.Fatal("gagal migrasi tabel:", err)
+	}
+
+	log.Println("Database siap!")
+
+	return db
+}
+func SeedUsers(db *gorm.DB) {
+	adminPassword := os.Getenv("ADMIN_PASSWORD")
+	operatorPassword := os.Getenv("OPERATOR_PASSWORD")
+
+	if adminPassword == "" || operatorPassword == "" {
+		log.Fatal("ADMIN_PASSWORD or OPERATOR_PASSWORD not set in .env")
+	}
+
+	seedUser(db, "admin", adminPassword, "admin")
+	seedUser(db, "operator", operatorPassword, "operator")
+}
+
+func seedUser(db *gorm.DB, username, plainPassword, role string) {
+	var existing models.User
+	result := db.Where("username = ?", username).First(&existing)
+
+	if result.Error == nil {
+		// user sudah ada, skip
+		return
+	}
+
+	hashed, err := utils.HashPassword(plainPassword)
+	if err != nil {
+		log.Printf("failed to hash password for %s: %v", username, err)
+		return
+	}
+
+	newUser := models.User{
+		Username: username,
+		Password: hashed,
+		Role:     role,
+	}
+
+	if result := db.Create(&newUser); result.Error != nil {
+		log.Printf("failed to seed user %s: %v", username, result.Error)
+		return
+	}
+
+	log.Printf("seeded user: %s (%s)", username, role)
+}
+</file>
+
+<file path="backend/models/settings.go">
+package models
+
+type Settings struct {
+	ID                  uint   `json:"id" gorm:"primaryKey"`
+	OpcUaAddress        string `json:"opc_ua_address"`
+	OpcNodePressure     string `json:"opc_node_pressure"`
+	OpcNodeCommand      string `json:"opc_node_command"`
+	OpcNodeFeedback     string `json:"opc_node_feedback"`
+	OpcNodeFlow         string `json:"opc_node_flow"`
+	OpcNodeOutput       string `json:"opc_node_output"`
+	OpcUaUsername       string `json:"opc_ua_username"`
+	OpcUaPassword       string `json:"-"`
+	OpcUaSecurityPolicy string `json:"opc_ua_security_policy"`
+	OpcUaSecurityMode   string `json:"opc_ua_security_mode"`
+}
+</file>
+
+<file path="frontend/src/router/index.js">
+import { createRouter, createWebHistory } from 'vue-router'
+import MainLayout from '../layouts/MainLayout.vue'
+
+import DashboardView from '../views/DashboardView.vue'
+import ValveListView from '../views/ValveListView.vue'
+import ValveDetailsView from '../views/ValveDetailsView.vue'
+import RecordsView from '../views/RecordsView.vue'
+import SettingView from '../views/SettingView.vue'
+import LoginView from '../views/LoginView.vue'
+import { useAuthStore } from '../stores/auth'
+
+
+
+const routes = [
+  {
+    path: '/login',
+    name: 'login',
+    component: LoginView
+  },
+  {
+  path: '/setting',
+  name: 'setting',
+  component: () => import('../views/SettingView.vue'),
+  meta: { requiresAuth: true, requiresAdmin: true }
+  },
+  {
+    path: '/',
+    component: MainLayout,
+    meta: { requiresAuth: true },
+    children: [
+      { path: '', name: 'dashboard', component: DashboardView },
+      { path: 'valves', name: 'valve-list', component: ValveListView },
+      { path: 'valves/details', name: 'valve-details-search', component: ValveDetailsView },
+      { path: 'valves/:id', name: 'valve-details', component: ValveDetailsView },
+      { path: 'records', name: 'records', component: RecordsView },
+      { path: 'settings', name: 'settings', component: SettingView, meta: { requiresAdmin: true } },
+    ]
+  }
+]
+
+const router = createRouter({
+  // import.meta.env.BASE_URL follows Vite's `base` config (see
+  // vite.config.js) so client-side navigation still works once the
+  // app is served under /valve-database-app/ behind ctrlX CORE's
+  // reverse proxy, not just at the site root.
+  history: createWebHistory(import.meta.env.BASE_URL),
+  routes
+})
+
+router.beforeEach((to, from, next) => {
+  const authStore = useAuthStore()
+
+  if (to.meta.requiresAuth && !authStore.isLoggedIn) {
+    next({ name: 'login' })
+  } else if (to.name === 'login' && authStore.isLoggedIn) {
+    next({ name: 'dashboard' })
+  // FIX: Enforce admin role check
+  } else if (to.meta.requiresAdmin && !authStore.isAdmin) {
+    next({ name: 'dashboard' }) 
+  } else {
+    next()
+  }
+})
+
+export default router
+</file>
+
+<file path="frontend/src/views/DashboardView.vue">
+<template>
+  <div class="dashboard-view">
+    <!-- Page header (fixed height) -->
+    <div class="dashboard-header">
+      <div>
+        <h2 class="m-0"></h2>
+        <p class="text-color-secondary m-0"></p>
+      </div>
+      <div class="header-actions">
+        <Button label="Valve List" icon="pi pi-list" @click="goToValveList" />
+        <Button label="Records" icon="pi pi-database" @click="goToRecords" />
+      </div>
+    </div>
+
+    <!-- 1. Summary KPI / Header Cards (compact, 3 in a row) -->
+    <div class="kpi-row">
+      <Card class="kpi-card">
+        <template #content>
+          <div class="kpi-content">
+            <div>
+              <div class="kpi-label">Total Registered Valves</div>
+              <div class="kpi-value">{{ summary.totalRegistered }}</div>
+            </div>
+            <i class="pi pi-sitemap kpi-icon text-primary"></i>
+          </div>
+        </template>
+      </Card>
+
+      <Card class="kpi-card">
+        <template #content>
+          <div class="kpi-content">
+            <div>
+              <div class="kpi-label">Active / Tested Valves</div>
+              <div class="kpi-value">{{ summary.activeTested }}</div>
+            </div>
+            <i class="pi pi-check-circle kpi-icon text-green-500"></i>
+          </div>
+        </template>
+      </Card>
+
+      <Card class="kpi-card">
+        <template #content>
+          <div class="kpi-content">
+            <div>
+              <div class="kpi-label">Incomplete Data</div>
+              <div class="kpi-value">{{ summary.incompleteData }}</div>
+            </div>
+            <i class="pi pi-exclamation-triangle kpi-icon text-orange-500"></i>
+          </div>
+        </template>
+      </Card>
+    </div>
+
+    <!-- 2. Visualisasi Data & Spesifikasi -->
+    <div class="dashboard-body">
+      <Card class="dashboard-card">
+        <template #title>Comparison of Valve Series</template>
+        <template #content>
+          <div class="chart-wrap">
+            <Chart
+              v-if="chartData.labels.length"
+              type="pie"
+              :data="chartData"
+              :options="chartOptions"
+              class="w-full h-full" />
+            <div v-else class="empty-state">
+              <i class="pi pi-chart-pie text-4xl text-color-secondary mb-2"></i>
+              <div class="text-color-secondary">No data yet</div>
+            </div>
+          </div>
+        </template>
+      </Card>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from "vue";
+import { useRouter } from "vue-router";
+
+// PrimeVue components (explicit import in case they're not registered globally)
+import Card from "primevue/card";
+import Button from "primevue/button";
+import Chart from "primevue/chart";
+import api from '../services/api'
+
+// Base URL for your Go/Gin backend
+const router = useRouter();
+
+const summary = ref({
+  totalRegistered: 0,
+  activeTested: 0,
+  incompleteData: 0,
+});
+
+const loadingSummary = ref(false);
+const loadingChart = ref(false);
+
+const chartData = ref({
+  labels: [],
+  datasets: [
+    {
+      data: [],
+      backgroundColor: [
+        "#42A5F5",
+        "#66BB6A",
+        "#FFA726",
+        "#EF5350",
+        "#AB47BC",
+        "#26C6DA",
+        "#8D6E63",
+      ],
+    },
+  ],
+});
+
+const chartOptions = ref({
+  plugins: {
+    legend: {
+      position: "right",
+    },
+  },
+  maintainAspectRatio: false,
+});
+
+function goToValveList() {
+  router.push("/valves");
+}
+
+function goToRecords() {
+  router.push("/records");
+}
+
+function isIncomplete(valve) {
+  return (
+    !valve.image_path ||
+    !valve.datasheet_path ||
+    !valve.manufacturer ||
+    !valve.part_number ||
+    !valve.component_series ||
+    !valve.valve_type ||
+    !valve.command_type ||
+    valve.command_value === null ||
+    valve.command_value === undefined ||
+    valve.command_value === ""
+  );
+}
+
+async function fetchSummary(valves) {
+  loadingSummary.value = true;
+  try {
+    summary.value.totalRegistered = valves.length;
+    summary.value.incompleteData = valves.filter(isIncomplete).length;
+    // activeTested left at 0 for now — depends on the Records endpoint,
+    // which we're wiring up separately.
+  } finally {
+    loadingSummary.value = false;
+  }
+}
+
+async function fetchChartData(valves) {
+  loadingChart.value = true;
+  try {
+    // Group valves by component_series (e.g. "3X", "4X", "5X")
+    const counts = {};
+    for (const valve of valves) {
+      const key = valve.component_series || "Unspecified";
+      counts[key] = (counts[key] || 0) + 1;
+    }
+    chartData.value.labels = Object.keys(counts);
+    chartData.value.datasets[0].data = Object.values(counts);
+  } finally {
+    loadingChart.value = false;
+  }
+}
+
+async function loadDashboardData() {
+  try {
+    const { data } = await api.get('/valves')
+    const valves = Array.isArray(data) ? data : []
+    await fetchSummary(valves)
+    await fetchChartData(valves)
+  } catch (err) {
+    console.error('Failed to load dashboard data:', err)
+  }
+}
+
+onMounted(() => {
+  loadDashboardData();
+});
+</script>
+
+<style scoped>
+/* Fills the height given by the layout. Uses overflow-y: auto as a safety
+   net — if content ever ends up taller than the available space (e.g. on a
+   very short window), it scrolls internally instead of getting clipped. */
+.dashboard-view {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  gap: 1rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+.dashboard-header {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.header-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* KPI row: plain CSS grid, doesn't depend on PrimeFlex being installed */
+.kpi-row {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 768px) {
+  .kpi-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Compact KPI cards, similar sizing to ValveDetailsView cards */
+.kpi-card :deep(.p-card-body) {
+  padding: 0.85rem 1rem;
+}
+
+.kpi-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.kpi-label {
+  font-size: 0.8rem;
+  color: var(--text-color-secondary);
+  margin-bottom: 0.25rem;
+}
+
+.kpi-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.kpi-icon {
+  font-size: 1.5rem;
+}
+
+/* Chart section: takes the remaining space */
+.dashboard-body {
+  flex: 1 1 auto;
+  min-height: 260px; /* guarantees the chart card has room even in a short viewport */
+  display: flex;
+}
+
+.dashboard-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+/* PrimeVue Card content area should stretch and allow its child to shrink */
+.dashboard-card :deep(.p-card-body),
+.dashboard-card :deep(.p-card-content) {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-wrap {
+  flex: 1 1 auto;
+  min-height: 220px;
+  position: relative;
+}
+
+.empty-state {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+</style>
+</file>
+
+<file path="frontend/src/views/ValveDetailsView.vue">
+<script setup>
+import { ref, computed, onMounted, watch } from "vue";
+import { API_ORIGIN } from "../services/api";
+import { useRoute } from "vue-router";
+import api from "../services/api";
+import { useValveStore } from "../stores/valve";
+import AutoComplete from "primevue/autocomplete";
+import Button from "primevue/button";
+
+const route = useRoute();
+const valveStore = useValveStore();
+const valve = computed(() => valveStore.selectedValve);
+
+const allValves = ref([]);
+const query = ref("");
+const suggestions = ref([]);
+const pendingValve = ref(null);
+
+async function loadValves() {
+  const res = await api.get("/valves");
+  allValves.value = res.data;
+}
+
+async function fetchValveById(id) {
+  if (!id) return;
+  try {
+    const res = await api.get(`/valves/${id}`);
+    valveStore.selectValve(res.data);
+  } catch (error) {
+    console.error("Failed to get Valve details:", error);
+  }
+}
+
+function search(event) {
+  const q = event.query.toLowerCase();
+  suggestions.value = allValves.value.filter((v) =>
+    v.part_number?.toLowerCase().includes(q),
+  );
+}
+
+function onSelect(event) {
+  pendingValve.value = event.value;
+}
+
+function confirmShow() {
+  if (pendingValve.value) {
+    valveStore.selectValve(pendingValve.value);
+  }
+}
+
+function openDatasheet() {
+  if (!datasheetUrl.value) return;
+  window.open(datasheetUrl.value, "_blank", "noopener");
+}
+
+const imageUrl = computed(() => {
+  if (!valve.value?.image_path) return null;
+  if (valve.value.image_path.startsWith("http")) return valve.value.image_path;
+  const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8080";
+  return `${baseUrl}${valve.value.image_path}`;
+});
+
+const datasheetUrl = computed(() => {
+  if (!valve.value?.datasheet_path) return null;
+  if (valve.value.datasheet_path.startsWith("http"))
+    return valve.value.datasheet_path;
+  const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8080";
+  return `${baseUrl}${valve.value.datasheet_path}`;
+});
+
+const feedback = {
+  position: 65,
+  current: 1.25,
+  temperature: 42,
+  status: "Normal",
+};
+
+onMounted(() => {
+  loadValves();
+  if (route.params.id) {
+    fetchValveById(route.params.id);
+  }
+});
+
+watch(
+  () => route.params.id,
+  (newId) => {
+    if (newId) {
+      fetchValveById(newId);
+    }
+  },
+);
+</script>
+
+<template>
+  <div class="records-page">
+    <div class="search-bar">
+      <AutoComplete
+        v-model="query"
+        :suggestions="suggestions"
+        optionLabel="part_number"
+        placeholder="Search Valve"
+        @complete="search"
+        @item-select="onSelect"
+        style="flex: 1"
+      />
+      <Button
+        label="Show Valve"
+        icon="pi pi-check"
+        @click="confirmShow"
+        :disabled="!pendingValve"
+      />
+    </div>
+
+    <div v-if="!valve" class="empty-state">
+      <i class="pi pi-info-circle"></i>
+      <p>Find and select the Valve above, then click Show Valve</p>
+    </div>
+
+    <div v-else class="grid">
+      <div class="card">
+        <h3>Picture of Valve</h3>
+        <img v-if="imageUrl" :src="imageUrl" alt="valve" class="valve-img" />
+        <div v-else class="valve-img placeholder">
+          <i class="pi pi-image"></i>
+        </div>
+        <p class="highlight">{{ valve.part_number }}</p>
+        <p class="muted">{{ valve.component_series }} {{ valve.valve_type }}</p>
+      </div>
+
+      <div class="card">
+        <h3>Pressure</h3>
+        <p class="big-number">
+          <strong>Max Pressure :</strong> {{ valve.max_pressure ?? "-" }} Bar
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>Flow</h3>
+        <p><strong>Rated Flow:</strong> {{ valve.rated_flow ?? "-" }}</p>
+        <p><strong>Max Flow:</strong> {{ valve.max_flow ?? "-" }}</p>
+      </div>
+
+      <div class="card">
+        <h3>Valve Datasheet</h3>
+        <div v-if="datasheetUrl" class="datasheet-box">
+          <i class="pi pi-file-pdf datasheet-icon"></i>
+          <Button
+            label="View Datasheet"
+            icon="pi pi-external-link"
+            @click="openDatasheet"
+          />
+        </div>
+        <p v-else class="muted">
+          There is no datasheet available for this valve
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>Command</h3>
+        <p><strong>Type:</strong> {{ valve.command_type || "-" }}</p>
+        <p><strong>Value:</strong> {{ valve.command_value ?? "-" }}</p>
+      </div>
+
+      <div class="card">
+        <h3>Feedback</h3>
+        <p><strong>Position:</strong> {{ feedback.position }}%</p>
+        <p><strong>Current:</strong> {{ feedback.current }} A</p>
+        <p><strong>Temperature:</strong> {{ feedback.temperature }} °C</p>
+        <p><strong>Status:</strong> {{ feedback.status }}</p>
+        <small class="muted"
+          >*simulation data, not connected in real-time</small
+        >
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.records-page {
+  height: calc(100vh - 30px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.search-bar {
+  display: flex;
+  gap: 0.75rem;
+  margin: 0 0 1rem 0;
+  flex-shrink: 0;
+}
+.grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 1rem;
+}
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 1.25rem 1.5rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.datasheet-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+}
+.datasheet-icon {
+  font-size: 2.5rem;
+  color: #dc2626;
+}
+.card h3 {
+  margin: 0 0 0.75rem 0;
+  font-size: 1.05rem;
+  color: var(--text-muted);
+}
+.big-number {
+  font-size: 2.25rem;
+  font-weight: 400;
+  color: #ffffff;
+  margin: 0;
+}
+.unit {
+  font-size: 1rem;
+  color: var(--text-muted);
+}
+.highlight {
+  font-weight: 600;
+  color: var(--primary-color);
+  margin: 0.5rem 0 0 0;
+  font-size: 1.1rem;
+}
+.muted {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin: 0.25rem 0 0 0;
+}
+.card p {
+  margin: 0.35rem 0;
+  font-size: 1rem;
+}
+.valve-img {
+  width: 100%;
+  height: 130px;
+  object-fit: contain;
+  background: var(--bg-color);
+  border-radius: 8px;
+}
+.valve-img.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  color: var(--text-muted);
+}
+.empty-state {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--text-muted);
+}
+.empty-state i {
+  font-size: 1.75rem;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+</style>
+</file>
+
+<file path="backend/controllers/opcua.go">
+package controllers
+
+import (
+	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"fmt"
+	"log"
+	"math/big"
+	"net/http"
+	"net/url"
+	"os"
+	"sync"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/gopcua/opcua"
+	"github.com/gopcua/opcua/ua"
+	"gorm.io/gorm"
+	"valve_database/models"
+)
+
+var (
+	opcClient *opcua.Client
+	opcMutex  sync.Mutex
+)
+
+// ResetOpcConnection terminates the current persistent connection
+func ResetOpcConnection() {
+	opcMutex.Lock()
+	defer opcMutex.Unlock()
+	if opcClient != nil {
+		opcClient.Close(context.Background())
+		opcClient = nil
+	}
+}
+
+func ensureClientCert() ([]byte, *rsa.PrivateKey, error) {
+	certFile := os.Getenv("OPCUA_CERT_PATH")
+	keyFile := os.Getenv("OPCUA_KEY_PATH")
+
+	if certFile == "" {
+		certFile = "./client_cert.pem"
+	}
+	if keyFile == "" {
+		keyFile = "./client_key.pem"
+	}
+
+	certPEM, err1 := os.ReadFile(certFile)
+	keyPEM, err2 := os.ReadFile(keyFile)
+	if err1 == nil && err2 == nil {
+		certBlock, _ := pem.Decode(certPEM)
+		keyBlock, _ := pem.Decode(keyPEM)
+		if certBlock != nil && keyBlock != nil {
+			privKey, _ := x509.ParsePKCS1PrivateKey(keyBlock.Bytes)
+			return certBlock.Bytes, privKey, nil
+		}
+	}
+
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	uri, _ := url.Parse("urn:TestBenchApp:GoClient")
+
+	template := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName:   "TestBench Go Client",
+			Organization: []string{"Bosch Rexroth Test Bench"},
+		},
+		URIs:                  []*url.URL{uri},
+		NotBefore:             time.Now().Add(-1 * time.Hour),
+		NotAfter:              time.Now().Add(10 * 365 * 24 * time.Hour),
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageContentCommitment | x509.KeyUsageKeyEncipherment | x509.KeyUsageDataEncipherment | x509.KeyUsageCertSign,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+	}
+
+	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	os.WriteFile(certFile, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes}), 0600)
+	os.WriteFile(keyFile, pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)}), 0600)
+
+	return derBytes, priv, nil
+}
+
+func getPersistentClient(ctx context.Context, s models.Settings) (*opcua.Client, error) {
+	opcMutex.Lock()
+	defer opcMutex.Unlock()
+
+	// Use the persistent connection if it already exists
+	if opcClient != nil {
+		if isClientHealthy(ctx, opcClient) {
+			return opcClient, nil
+		}
+		opcClient.Close(ctx)
+		opcClient = nil
+	}
+
+	if s.OpcUaAddress == "" {
+		return nil, fmt.Errorf("OPC UA Address is not configured")
+	}
+
+	mode := ua.MessageSecurityModeNone
+	switch s.OpcUaSecurityMode {
+	case "Sign":
+		mode = ua.MessageSecurityModeSign
+	case "SignAndEncrypt":
+		mode = ua.MessageSecurityModeSignAndEncrypt
+	}
+
+	policyURI := "http://opcfoundation.org/UA/SecurityPolicy#" + s.OpcUaSecurityPolicy
+	if s.OpcUaSecurityPolicy == "None" || s.OpcUaSecurityPolicy == "" {
+		policyURI = "http://opcfoundation.org/UA/SecurityPolicy#None"
+	}
+
+	endpoints, err := opcua.GetEndpoints(ctx, s.OpcUaAddress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get endpoints: %v", err)
+	}
+
+	ep, err := opcua.SelectEndpoint(endpoints, policyURI, mode)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find suitable endpoint for policy %s and mode %v: %v", policyURI, mode, err)
+	}
+	if ep == nil {
+		return nil, fmt.Errorf("failed to find suitable endpoint for policy %s and mode %v", policyURI, mode)
+	}
+
+	ep.EndpointURL = s.OpcUaAddress
+
+	opts := []opcua.Option{
+		opcua.ApplicationURI("urn:TestBenchApp:GoClient"),
+	}
+
+	if mode != ua.MessageSecurityModeNone {
+		cert, privKey, err := ensureClientCert()
+		if err != nil {
+			return nil, fmt.Errorf("failed to load/generate client cert: %v", err)
+		}
+		opts = append(opts, opcua.Certificate(cert), opcua.PrivateKey(privKey))
+	}
+
+	if s.OpcUaUsername != "" {
+		opts = append(opts, opcua.SecurityFromEndpoint(ep, ua.UserTokenTypeUserName))
+		opts = append(opts, opcua.AuthUsername(s.OpcUaUsername, s.OpcUaPassword))
+	} else {
+		opts = append(opts, opcua.SecurityFromEndpoint(ep, ua.UserTokenTypeAnonymous))
+		opts = append(opts, opcua.AuthAnonymous())
+	}
+
+	client, err := opcua.NewClient(ep.EndpointURL, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %v", err)
+	}
+
+	if err := client.Connect(ctx); err != nil {
+		return nil, fmt.Errorf("failed to connect client: %v", err)
+	}
+
+	opcClient = client
+	return opcClient, nil
+}
+
+func GetOpcData(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var s models.Settings
+		db.First(&s, 1)
+
+		ctx := context.Background()
+		client, err := getPersistentClient(ctx, s)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to connect: " + err.Error()})
+			return
+		}
+		// No more defer client.Close(ctx) here to keep the connection open
+
+		readNode := func(nodeID string) interface{} {
+			if nodeID == "" {
+				return nil
+			}
+			id, err := ua.ParseNodeID(nodeID)
+			if err != nil {
+				return nil
+			}
+			req := &ua.ReadRequest{
+				MaxAge:      2000,
+				NodesToRead: []*ua.ReadValueID{{NodeID: id, AttributeID: ua.AttributeIDValue}},
+			}
+			res, err := client.Read(ctx, req)
+			if err != nil || len(res.Results) == 0 || res.Results[0].Status != ua.StatusOK {
+				return nil
+			}
+			return res.Results[0].Value.Value()
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"pressure": readNode(s.OpcNodePressure),
+			"command":  readNode(s.OpcNodeCommand),
+			"feedback": readNode(s.OpcNodeFeedback),
+			"flow":     readNode(s.OpcNodeFlow),
+		})
+	}
+}
+
+func writeBoolNode(db *gorm.DB, value bool) error {
+	var s models.Settings
+	db.First(&s, 1)
+
+	if s.OpcNodeOutput == "" {
+		return fmt.Errorf("Output Node ID is not configured")
+	}
+
+	ctx := context.Background()
+	client, err := getPersistentClient(ctx, s)
+	if err != nil {
+		return err
+	}
+
+	id, err := ua.ParseNodeID(s.OpcNodeOutput)
+	if err != nil {
+		return fmt.Errorf("invalid Output Node ID format")
+	}
+
+	v, _ := ua.NewVariant(value)
+	req := &ua.WriteRequest{
+		NodesToWrite: []*ua.WriteValue{
+			{
+				NodeID:      id,
+				AttributeID: ua.AttributeIDValue,
+				Value: &ua.DataValue{
+					EncodingMask: ua.DataValueValue,
+					Value:        v,
+				},
+			},
+		},
+	}
+
+	res, err := client.Write(ctx, req)
+	if err != nil {
+		return err
+	}
+	if res.Results[0] != ua.StatusOK {
+		return fmt.Errorf("OPC UA write failed with status: %v", res.Results[0])
+	}
+	return nil
+}
+
+func StartOutput(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if err := writeBoolNode(db, true); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"status": "active"})
+	}
+}
+
+func StopOutput(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if err := writeBoolNode(db, false); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"status": "stopped"})
+	}
+}
+
+func GetOpcStatus(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var s models.Settings
+		db.First(&s, 1)
+
+		status := gin.H{
+			"server":   false,
+			"command":  gin.H{"connected": false, "value": "-"},
+			"feedback": gin.H{"connected": false, "value": "-"},
+			"pressure": gin.H{"connected": false, "value": "-"},
+			"flow":     gin.H{"connected": false, "value": "-"},
+			"output":   gin.H{"connected": false, "value": "-"},
+		}
+
+		if s.OpcUaAddress == "" {
+			c.JSON(http.StatusOK, status)
+			return
+		}
+
+		ctx := context.Background()
+		client, err := getPersistentClient(ctx, s)
+		if err != nil {
+			log.Printf("OPC UA Connection Failed: %v\n", err)
+			c.JSON(http.StatusOK, status)
+			return
+		}
+
+		status["server"] = true
+
+		checkNode := func(nodeID string) gin.H {
+			if nodeID == "" {
+				return gin.H{"connected": false, "value": "-"}
+			}
+			id, err := ua.ParseNodeID(nodeID)
+			if err != nil {
+				return gin.H{"connected": false, "value": "-"}
+			}
+			req := &ua.ReadRequest{
+				MaxAge:      2000,
+				NodesToRead: []*ua.ReadValueID{{NodeID: id, AttributeID: ua.AttributeIDValue}},
+			}
+			res, err := client.Read(ctx, req)
+			if err != nil || len(res.Results) == 0 || res.Results[0].Status != ua.StatusOK {
+				return gin.H{"connected": false, "value": "-"}
+			}
+			val := "-"
+			if res.Results[0].Value != nil {
+				val = fmt.Sprintf("%v", res.Results[0].Value.Value())
+			}
+			return gin.H{"connected": true, "value": val}
+		}
+
+		status["command"] = checkNode(s.OpcNodeCommand)
+		status["feedback"] = checkNode(s.OpcNodeFeedback)
+		status["pressure"] = checkNode(s.OpcNodePressure)
+		status["flow"] = checkNode(s.OpcNodeFlow)
+		status["output"] = checkNode(s.OpcNodeOutput)
+
+		c.JSON(http.StatusOK, status)
+	}
+}
+
+func isClientHealthy(ctx context.Context, client *opcua.Client) bool {
+
+	if client == nil {
+		return false
+	}
+
+	req := &ua.ReadRequest{
+		NodesToRead: []*ua.ReadValueID{
+			{
+				NodeID:      ua.NewNumericNodeID(0, 2258),
+				AttributeID: ua.AttributeIDValue,
+			},
+		},
+	}
+
+	resp, err := client.Read(ctx, req)
+
+	if err != nil {
+		return false
+	}
+
+	if len(resp.Results) == 0 {
+		return false
+	}
+
+	return resp.Results[0].Status == ua.StatusOK
+}
+</file>
+
+<file path=".gitignore">
+# Environment
+backend/.env
+.env
+.env.*
+
+# SQLite
+backend/data.db
+*.db
+*.sqlite
+*.sqlite3
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# VSCode
+.vscode/
+
+# Generated files
+repomix-output.xml
+
+# Logs
+*.log
+
+# Go build
+*.exe
+*.out
+
+backend/client_cert.pem
+backend/client_key.pem
+*.pem
+# TLS credentials (never commit)
+backend/client_cert.pem
+backend/client_key.pem
+*.pem
+
+# SQLite journal files
+*.db-shm
+*.db-wal
+*.bak-darktheme
+</file>
+
+<file path="backend/go.mod">
+module valve_database
+
+go 1.26.4
+
+require (
+	github.com/gin-contrib/cors v1.7.7
+	github.com/gin-gonic/gin v1.12.0
+	github.com/glebarez/sqlite v1.11.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/joho/godotenv v1.5.1
+	golang.org/x/crypto v0.55.0
+	gorm.io/gorm v1.31.2
+)
+
+require (
+	github.com/bytedance/gopkg v0.1.3 // indirect
+	github.com/bytedance/sonic v1.15.0 // indirect
+	github.com/bytedance/sonic/loader v0.5.0 // indirect
+	github.com/cloudwego/base64x v0.1.6 // indirect
+	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/gabriel-vasile/mimetype v1.4.12 // indirect
+	github.com/gin-contrib/sse v1.1.0 // indirect
+	github.com/glebarez/go-sqlite v1.21.2 // indirect
+	github.com/go-playground/locales v0.14.1 // indirect
+	github.com/go-playground/universal-translator v0.18.1 // indirect
+	github.com/go-playground/validator/v10 v10.30.1 // indirect
+	github.com/goccy/go-json v0.10.5 // indirect
+	github.com/goccy/go-yaml v1.19.2 // indirect
+	github.com/google/uuid v1.6.0 // indirect
+	github.com/gopcua/opcua v0.9.1
+	github.com/jinzhu/inflection v1.0.0 // indirect
+	github.com/jinzhu/now v1.1.5 // indirect
+	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
+	github.com/leodido/go-urn v1.4.0 // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
+	github.com/modern-go/reflect2 v1.0.2 // indirect
+	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
+	github.com/quic-go/qpack v0.6.0 // indirect
+	github.com/quic-go/quic-go v0.59.0 // indirect
+	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
+	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
+	github.com/ugorji/go/codec v1.3.1 // indirect
+	go.mongodb.org/mongo-driver/v2 v2.5.0 // indirect
+	golang.org/x/arch v0.23.0 // indirect
+	golang.org/x/net v0.57.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
+	google.golang.org/protobuf v1.36.10 // indirect
+	modernc.org/libc v1.22.5 // indirect
+	modernc.org/mathutil v1.5.0 // indirect
+	modernc.org/memory v1.5.0 // indirect
+	modernc.org/sqlite v1.23.1 // indirect
+)
+</file>
+
+<file path="backend/main.go">
+package main
+
+import (
+	"log"
+	"os"
+
+	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
+
+	"valve_database/controllers"
+	"valve_database/database"
+	"valve_database/middleware"
+)
+
+func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Println("Warning: .env tidak ditemukan, pakai default")
+	}
+	appPort := os.Getenv("APP_PORT")
+	if appPort == "" {
+		appPort = "8080"
+	}
+
+	db := database.ConnectDB()
+	database.SeedUsers(db)
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatal("gagal mengambil koneksi sql:", err)
+	}
+	defer sqlDB.Close()
+
+	// FIX
+	os.MkdirAll("./images", os.ModePerm)
+	os.MkdirAll("./datasheets", os.ModePerm)
+
+	router := gin.Default()
+	api := router.Group("/api")
+	{
+		api.GET("/ping", controllers.Ping)
+		api.POST("/login", controllers.Login(db))
+
+		api.GET("/valves", controllers.GetValves(db))
+		api.GET("/valves/:id", controllers.GetValveByID(db))
+
+		api.PUT("/valves/:id", middleware.AuthRequired(), controllers.UpdateValve(db))
+
+		api.POST("/valves", middleware.AuthRequired(), middleware.AdminOnly(), controllers.CreateValve(db))
+		api.DELETE("/valves/:id", middleware.AuthRequired(), middleware.AdminOnly(), controllers.DeleteValve(db))
+		api.POST("/valves/:id/image", middleware.AuthRequired(), middleware.AdminOnly(), controllers.UploadValveImage(db))
+		api.POST("/valves/:id/datasheet", middleware.AuthRequired(), middleware.AdminOnly(), controllers.UploadValveDatasheet(db))
+
+		api.GET("/settings", middleware.AuthRequired(), middleware.AdminOnly(), controllers.GetSettings(db))
+		api.PUT("/settings", middleware.AuthRequired(), middleware.AdminOnly(), controllers.UpdateSettings(db))
+
+		// OPC UA routes
+		api.GET("/opcua/data", middleware.AuthRequired(), controllers.GetOpcData(db))
+		api.POST("/ctrlx/start", middleware.AuthRequired(), controllers.StartOutput(db))
+		api.GET("/opcua/status", middleware.AuthRequired(), controllers.GetOpcStatus(db))
+		api.POST("/ctrlx/stop", middleware.AuthRequired(), controllers.StopOutput(db))
+
+		//OPC UA Routes
+		router.GET("/opcua/data", middleware.AuthRequired(), controllers.GetOpcData(db))
+		router.POST("/ctrlx/start", middleware.AuthRequired(), controllers.StartOutput(db))
+		router.GET("/opcua/status", middleware.AuthRequired(), controllers.GetOpcStatus(db))
+		router.POST("/ctrlx/stop", middleware.AuthRequired(), controllers.StopOutput(db))
+
+		router.Run(":" + appPort)
+	}
+}
+</file>
+
+<file path="frontend/src/services/api.js">
+import axios from 'axios'
+import { useAuthStore } from '../stores/auth'
+
+
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080',
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+
+api.interceptors.request.use((config) => {
+  const authStore = useAuthStore()
+  if (authStore.token) {
+    config.headers.Authorization = `Bearer ${authStore.token}`
+  }
+  return config
+})
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const isLoginRequest = error.config?.url?.includes('/login')
+
+    if (error.response?.status === 401 && !isLoginRequest) {
+      const authStore = useAuthStore()
+      authStore.logout()
+      window.location.href = '/login'
+    }
+    return Promise.reject(error)
+  }
+)
+
+export function uploadValveImage(id, file) {
+  const formData = new FormData()
+  formData.append('image', file)
+
+  return api.post(`/valves/${id}/image`, formData, {
+    headers: { 'Content-Type': undefined }
+  })
+}
+
+export function uploadValveDatasheet(id, file) {
+  const formData = new FormData()
+  formData.append('datasheet', file)
+
+  return api.post(`/valves/${id}/datasheet`, formData, {
+    headers: { 'Content-Type': undefined }
+  })
+}
+
+export function startOutput() {
+  return api.post('/ctrlx/start') // Route kept same for minimal disruption
+}
+
+export function stopOutput() {
+  return api.post('/ctrlx/stop')
+}
+
+export function fetchOpcData() {
+  return api.get('/opcua/data')
+}
+
+export default api
+</file>
+
+<file path="frontend/src/views/RecordsView.vue">
+<script setup>
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRoute } from "vue-router";
+import api, { startOutput, stopOutput, fetchOpcData } from "../services/api";
+import { useValveStore } from "../stores/valve";
+
+import AutoComplete from "primevue/autocomplete";
+import Button from "primevue/button";
+import { useToast } from "primevue/usetoast";
+
+import { Line } from "vue-chartjs";
+import {
+  Chart as ChartJS,
+  Title,
+  Tooltip,
+  Legend,
+  LineElement,
+  PointElement,
+  LinearScale,
+  CategoryScale,
+  Filler,
+} from "chart.js";
+
+// Register CategoryScale for the Time labels on the X-axis
+ChartJS.register(
+  Title,
+  Tooltip,
+  Legend,
+  LineElement,
+  PointElement,
+  LinearScale,
+  CategoryScale,
+  Filler,
+);
+
+const STEPS = 40;
+
+const route = useRoute();
+const valveStore = useValveStore();
+const toast = useToast();
+
+const valve = computed(() => valveStore.selectedValve);
+
+const allValves = ref([]);
+const query = ref("");
+const suggestions = ref([]);
+const pendingValve = ref(null);
+
+const controlStatus = ref("stopped");
+const isRecording = ref(false);
+const isStarting = ref(false);
+const isStopping = ref(false);
+const imageViewerVisible = ref(false);
+
+// LIVE DATA STATE ARRAYS FOR GRAPHS
+let liveDataInterval = null;
+const liveLabels = ref(Array(STEPS).fill("")); // Array for Time Strings
+const livePressureHistory = ref(Array(STEPS).fill(0));
+const liveFlowHistory = ref(Array(STEPS).fill(0));
+const liveCommandHistory = ref(Array(STEPS).fill(0));
+const liveFeedbackHistory = ref(Array(STEPS).fill(0));
+
+const currentValues = ref({
+  pressure: "0.0",
+  flow: "0.0",
+  command: "0.0",
+  feedback: "0.0",
+});
+
+async function loadValves() {
+  try {
+    const response = await api.get("/valves");
+    allValves.value = Array.isArray(response.data) ? response.data : [];
+  } catch (error) {
+    console.error("Failed to fetch valve list:", error);
+    toast.add({
+      severity: "error",
+      summary: "Load Failed",
+      detail: "Unable to load the valve list.",
+      life: 3000,
+    });
+  }
+}
+
+async function fetchValveById(id) {
+  if (!id) return;
+  try {
+    const response = await api.get(`/valves/${id}`);
+    valveStore.selectValve(response.data);
+  } catch (error) {
+    console.error("Failed to fetch valve details:", error);
+  }
+}
+
+function search(event) {
+  const keyword = String(event.query || "")
+    .trim()
+    .toLowerCase();
+  if (!keyword) {
+    suggestions.value = allValves.value;
+    return;
+  }
+  suggestions.value = allValves.value.filter((item) => {
+    const partNumber = item.part_number?.toLowerCase() || "";
+    const manufacturer = item.manufacturer?.toLowerCase() || "";
+    return partNumber.includes(keyword) || manufacturer.includes(keyword);
+  });
+}
+
+function onSelect(event) {
+  pendingValve.value = event.value;
+}
+
+function confirmShow() {
+  if (!pendingValve.value) return;
+  valveStore.selectValve(pendingValve.value);
+  toast.add({
+    severity: "info",
+    summary: "Valve Selected",
+    detail: `${pendingValve.value.part_number} is ready for testing.`,
+    life: 2500,
+  });
+}
+
+async function startValve() {
+  if (!valve.value || isStarting.value) return;
+  isStarting.value = true;
+  try {
+    await startOutput();
+    controlStatus.value = "active";
+    toast.add({
+      severity: "success",
+      summary: "START",
+      detail: "Output ON",
+      life: 3000,
+    });
+  } catch (error) {
+    toast.add({
+      severity: "error",
+      summary: "START FAILED",
+      detail: "Unable to activate the output.",
+      life: 4000,
+    });
+  } finally {
+    isStarting.value = false;
+  }
+}
+
+async function stopValve() {
+  if (!valve.value || isStopping.value) return;
+  isStopping.value = true;
+  try {
+    await stopOutput();
+    controlStatus.value = "stopped";
+    isRecording.value = false;
+    toast.add({
+      severity: "warn",
+      summary: "STOP",
+      detail: "Output OFF",
+      life: 3000,
+    });
+  } catch (error) {
+    toast.add({
+      severity: "error",
+      summary: "STOP FAILED",
+      detail: "Unable to stop the output.",
+      life: 4000,
+    });
+  } finally {
+    isStopping.value = false;
+  }
+}
+
+function toggleRecord() {
+  if (!valve.value) return;
+  isRecording.value = !isRecording.value;
+  toast.add({
+    severity: isRecording.value ? "info" : "warn",
+    summary: isRecording.value ? "RECORDING STARTED" : "RECORDING STOPPED",
+    detail: isRecording.value
+      ? "Data recording active."
+      : "Data recording stopped.",
+    life: 3000,
+  });
+}
+
+const imageUrl = computed(() => {
+  if (!valve.value?.image_path) return null;
+  if (valve.value.image_path.startsWith("http")) return valve.value.image_path;
+  const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8080";
+  return `${baseUrl}${valve.value.image_path}`;
+});
+
+function openImageViewer() {
+  if (!imageUrl.value) return;
+  imageViewerVisible.value = true;
+  document.body.style.overflow = "hidden";
+}
+
+function closeImageViewer() {
+  imageViewerVisible.value = false;
+  document.body.style.overflow = "";
+}
+
+function handleImageViewerKeydown(event) {
+  if (event.key === "Escape" && imageViewerVisible.value) {
+    closeImageViewer();
+  }
+}
+
+// FETCH LIVE OPC UA DATA
+async function pollLiveData() {
+  // Generate current timestamp string (HH:MM:SS)
+  const now = new Date();
+  const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`;
+
+  try {
+    const response = await fetchOpcData();
+    const data = response.data;
+
+    currentValues.value.pressure =
+      data.pressure !== null ? Number(data.pressure).toFixed(1) : "0.0";
+    currentValues.value.flow =
+      data.flow !== null ? Number(data.flow).toFixed(1) : "0.0";
+    currentValues.value.command =
+      data.command !== null ? Number(data.command).toFixed(1) : "0.0";
+    currentValues.value.feedback =
+      data.feedback !== null ? Number(data.feedback).toFixed(1) : "0.0";
+
+    // Reassign completely new arrays to force Vue reactivity and Chart.js re-renders
+    liveLabels.value = [...liveLabels.value.slice(1), timeStr];
+    livePressureHistory.value = [
+      ...livePressureHistory.value.slice(1),
+      data.pressure !== null ? Number(data.pressure) : 0,
+    ];
+    liveFlowHistory.value = [
+      ...liveFlowHistory.value.slice(1),
+      data.flow !== null ? Number(data.flow) : 0,
+    ];
+    liveCommandHistory.value = [
+      ...liveCommandHistory.value.slice(1),
+      data.command !== null ? Number(data.command) : 0,
+    ];
+    liveFeedbackHistory.value = [
+      ...liveFeedbackHistory.value.slice(1),
+      data.feedback !== null ? Number(data.feedback) : 0,
+    ];
+  } catch (error) {
+    // If the server disconnects, push 0s but keep the time moving forward to show a flatline
+    liveLabels.value = [...liveLabels.value.slice(1), timeStr];
+    livePressureHistory.value = [...livePressureHistory.value.slice(1), 0];
+    liveFlowHistory.value = [...liveFlowHistory.value.slice(1), 0];
+    liveCommandHistory.value = [...liveCommandHistory.value.slice(1), 0];
+    liveFeedbackHistory.value = [...liveFeedbackHistory.value.slice(1), 0];
+  }
+}
+
+// CHART DATA COMPUTED PROPERTIES
+const pressureChartData = computed(() => ({
+  labels: liveLabels.value, // Bind to the time array
+  datasets: [
+    {
+      label: "Pressure (bar)",
+      data: livePressureHistory.value,
+      borderColor: "#3b82f6",
+      backgroundColor: "rgba(59, 130, 246, 0.12)",
+      fill: true,
+      tension: 0.35,
+      pointRadius: 0,
+      borderWidth: 2,
+    },
+  ],
+}));
+
+const flowChartData = computed(() => ({
+  labels: liveLabels.value,
+  datasets: [
+    {
+      label: "Flow (L/min)",
+      data: liveFlowHistory.value,
+      borderColor: "#22c55e",
+      backgroundColor: "rgba(34, 197, 94, 0.08)",
+      fill: true,
+      tension: 0.35,
+      pointRadius: 0,
+      borderWidth: 2,
+    },
+  ],
+}));
+
+const commandChartData = computed(() => ({
+  labels: liveLabels.value,
+  datasets: [
+    {
+      label: "Command",
+      data: liveCommandHistory.value,
+      borderColor: "#f59e0b",
+      backgroundColor: "rgba(245, 158, 11, 0.12)",
+      fill: true,
+      tension: 0.35,
+      pointRadius: 0,
+      borderWidth: 2,
+    },
+  ],
+}));
+
+const feedbackChartData = computed(() => ({
+  labels: liveLabels.value,
+  datasets: [
+    {
+      label: "Feedback",
+      data: liveFeedbackHistory.value,
+      borderColor: "#8b5cf6",
+      backgroundColor: "rgba(139, 92, 246, 0.12)",
+      fill: true,
+      tension: 0.35,
+      pointRadius: 0,
+      borderWidth: 2,
+    },
+  ],
+}));
+
+const chartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  animation: { duration: 0 },
+  interaction: { intersect: false, mode: "index" },
+  plugins: {
+    legend: {
+      display: true,
+      position: "bottom",
+      labels: {
+        boxWidth: 10,
+        boxHeight: 3,
+        usePointStyle: true,
+        padding: 12,
+        font: { size: 10 },
+      },
+    },
+    tooltip: { enabled: true },
+  },
+  scales: {
+    x: {
+      display: true, // Unhide the X-Axis
+      type: "category",
+      grid: { display: false },
+      ticks: {
+        color: "#64748b",
+        font: { size: 9 },
+        maxTicksLimit: 8, // Prevents overcrowding the bottom with 40 timestamps
+      },
+    },
+    y: {
+      beginAtZero: true,
+      border: { display: false },
+      grid: { color: "rgba(148, 163, 184, 0.14)" },
+      ticks: { color: "#64748b", font: { size: 9 } },
+    },
+  },
+};
+
+onMounted(async () => {
+  await loadValves();
+  if (route.params.id) {
+    await fetchValveById(route.params.id);
+  }
+  window.addEventListener("keydown", handleImageViewerKeydown);
+  liveDataInterval = setInterval(pollLiveData, 1000);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("keydown", handleImageViewerKeydown);
+  document.body.style.overflow = "";
+  if (liveDataInterval) clearInterval(liveDataInterval);
+});
+
+watch(
+  () => route.params.id,
+  async (newId) => {
+    if (newId) await fetchValveById(newId);
+  },
+);
+</script>
+
+<template>
+  <div class="records-page">
+    <div class="search-toolbar">
+      <div class="search-section">
+        <AutoComplete
+          v-model="query"
+          :suggestions="suggestions"
+          optionLabel="part_number"
+          placeholder="Input Part Number/Name"
+          class="valve-search"
+          @complete="search"
+          @item-select="onSelect">
+          <template #option="slotProps">
+            <div class="search-option">
+              <strong>{{ slotProps.option.part_number }}</strong>
+              <span
+                >{{ slotProps.option.manufacturer || "-" }} ·
+                {{ slotProps.option.valve_type || "-" }}</span
+              >
+            </div>
+          </template>
+        </AutoComplete>
+        <Button
+          label="Search"
+          icon="pi pi-search"
+          :disabled="!pendingValve"
+          @click="confirmShow" />
+      </div>
+
+      <!-- NEW: Real-time Values Display -->
+      <div class="live-values-section">
+                <div class="live-value-item">
+          <span class="label">Real-time value</span>
+        </div>
+        <div class="live-value-item">
+          <span class="label">Command</span>
+          <span class="value">{{ currentValues.command }}</span>
+        </div>
+        <div class="live-value-item">
+          <span class="label">Feedback</span>
+          <span class="value">{{ currentValues.feedback }}</span>
+        </div>
+        <div class="live-value-item">
+          <span class="label">Pressure</span>
+          <span class="value"
+            >{{ currentValues.pressure }} <small>bar</small></span
+          >
+        </div>
+        <div class="live-value-item">
+          <span class="label">Flow</span>
+          <span class="value"
+            >{{ currentValues.flow }} <small>L/min</small></span
+          >
+        </div>
+      </div>
+    </div>
+
+    <!-- ALWAYS VISIBLE GRID LAYOUT -->
+    <div class="wireframe-grid">
+      <!-- LEFT COLUMN: Controls, Picture, Valve Info -->
+      <div class="sidebar-column">
+        <!-- Control Buttons -->
+        <section class="panel control-panel">
+          <Button
+            label="Start"
+            severity="success"
+            class="ctrl-btn"
+            :loading="isStarting"
+            :disabled="!valve || isStarting || controlStatus === 'active'"
+            @click="startValve" />
+          <Button
+            label="Stop"
+            severity="danger"
+            class="ctrl-btn"
+            :loading="isStopping"
+            :disabled="!valve || isStopping || controlStatus === 'stopped'"
+            @click="stopValve" />
+          <Button
+            :label="isRecording ? 'Stop Record' : 'Record'"
+            :severity="isRecording ? 'warn' : 'secondary'"
+            class="ctrl-btn"
+            :disabled="!valve"
+            @click="toggleRecord" />
+        </section>
+
+        <!-- Picture of Valve -->
+        <section class="panel picture-panel">
+          <header class="panel-header">
+            <h3>Picture of valve</h3>
+          </header>
+          <button
+            v-if="imageUrl"
+            type="button"
+            class="picture-content picture-button"
+            @click="openImageViewer">
+            <img
+              :src="imageUrl"
+              :alt="`Valve ${valve?.part_number || ''}`"
+              class="valve-image" />
+          </button>
+          <div v-else class="picture-content">
+            <div class="image-placeholder">
+              <i class="pi pi-image"></i>
+              <span v-if="!valve" style="font-size: 0.7rem; margin-top: 0.5rem"
+                >No valve selected</span
+              >
+            </div>
+          </div>
+        </section>
+
+        <!-- Valve Database Info -->
+        <section class="panel info-panel">
+          <div class="info-row">
+            <span class="info-label">Valve Name</span>
+            <span class="info-val"
+              >{{ valve?.manufacturer || "-" }}
+              {{ valve?.valve_type || "" }}</span
+            >
+          </div>
+          <div class="info-row">
+            <span class="info-label">Part Number</span>
+            <span class="info-val">{{ valve?.part_number || "-" }}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Rated Flow</span>
+            <span class="info-val">{{ valve?.rated_flow ?? "-" }} L/min</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Max Flow</span>
+            <span class="info-val">{{ valve?.max_flow ?? "-" }} L/min</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Max Pressure</span>
+            <span class="info-val">{{ valve?.max_pressure ?? "-" }} bar</span>
+          </div>
+        </section>
+      </div>
+
+      <!-- MIDDLE COLUMN: Pressure & Command Graphs -->
+      <section class="panel graph-panel pressure-graph">
+        <header class="panel-header"><h3>Pressure Graph</h3></header>
+        <div class="chart-container">
+          <Line
+            :key="`pressure-chart`"
+            :data="pressureChartData"
+            :options="chartOptions" />
+        </div>
+      </section>
+
+      <section class="panel graph-panel command-graph">
+        <header class="panel-header"><h3>Command Graph</h3></header>
+        <div class="chart-container">
+          <Line
+            :key="`command-chart`"
+            :data="commandChartData"
+            :options="chartOptions" />
+        </div>
+      </section>
+
+      <!-- RIGHT COLUMN: Flow & Feedback Graphs -->
+      <section class="panel graph-panel flow-graph">
+        <header class="panel-header"><h3>Flow Graph</h3></header>
+        <div class="chart-container">
+          <Line
+            :key="`flow-chart`"
+            :data="flowChartData"
+            :options="chartOptions" />
+        </div>
+      </section>
+
+      <section class="panel graph-panel feedback-graph">
+        <header class="panel-header"><h3>Feedback Graph</h3></header>
+        <div class="chart-container">
+          <Line
+            :key="`feedback-chart`"
+            :data="feedbackChartData"
+            :options="chartOptions" />
+        </div>
+      </section>
+    </div>
+
+    <!-- Image Viewer Modal -->
+    <Teleport to="body">
+      <Transition name="viewer">
+        <div
+          v-if="imageViewerVisible"
+          class="image-viewer"
+          @click.self="closeImageViewer">
+          <header class="viewer-header">
+            <div>
+              <span>VALVE IMAGE</span
+              ><strong>{{ valve?.part_number || "-" }}</strong>
+            </div>
+            <button
+              type="button"
+              class="viewer-close-button"
+              @click="closeImageViewer">
+              <i class="pi pi-times"></i>
+            </button>
+          </header>
+          <div class="viewer-content">
+            <img
+              :src="imageUrl"
+              :alt="`Valve ${valve?.part_number || ''}`"
+              class="viewer-image" />
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+  </div>
+</template>
+
+<style scoped>
+.records-page {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  overflow: hidden;
+}
+
+.search-toolbar {
+  min-height: 42px; /* Reduced from 52px */
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* Pushes search to left, values to right */
+  padding: 0.5rem 1rem; /* Slightly wider padding for aesthetics */
+  background: var(--card-bg);
+  border: 1px solid #475569;
+  border-radius: 4px;
+  flex-wrap: wrap; /* Allows stacking on very small screens */
+  gap: 1rem;
+}
+
+.search-section {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  max-width: 500px; /* Reduced slightly to make room for metrics */
+}
+
+/* NEW: Live Values Toolbar Styling */
+.live-values-section {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.live-value-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 4.5rem; /* Locks the width so containers never shrink/grow */
+}
+
+.live-value-item:first-child {
+  min-width: auto; 
+  justify-content: flex-end;
+  margin-right: 0.5rem;
+}
+
+.live-value-item .label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.1rem;
+}
+
+.live-value-item .value {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--primary-color);
+  font-family: Consolas, Monaco, monospace;
+  font-variant-numeric: tabular-nums; /* Prevents micro-jitters between '1' and '8' widths */
+  white-space: nowrap; /* Prevents the unit from wrapping to a new line */
+}
+
+.live-value-item .value small {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: normal;
+}
+
+.valve-search {
+  flex: 1;
+}
+.valve-search :deep(.p-autocomplete),
+.valve-search :deep(.p-inputtext) {
+  width: 100%;
+}
+
+/* --- WIREFRAME GRID LAYOUT --- */
+.wireframe-grid {
+  flex: 1;
+  min-height: 0;
+  min-width: 0; /* Allows grid to shrink */
+  display: grid;
+  /* Use minmax(0, 1fr) instead of 1fr to prevent chart blowout */
+  grid-template-columns: 280px minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas:
+    "sidebar pressure flow"
+    "sidebar command feedback";
+  gap: 0.85rem;
+}
+
+/* Sidebar Column */
+.sidebar-column {
+  grid-area: sidebar;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  min-height: 0;
+  min-width: 0; /* Allows column to shrink */
+}
+
+.control-panel {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  padding: 0.75rem;
+  flex-shrink: 0;
+}
+.ctrl-btn {
+  width: 100%;
+  padding: 0.5rem 0;
+}
+
+.picture-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 200px;
+}
+.picture-content {
+  flex: 1;
+  padding: 0.5rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: transparent;
+  border: none;
+}
+.valve-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 4px;
+}
+.image-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: var(--text-muted);
+  font-size: 2rem;
+}
+
+.info-panel {
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  padding-bottom: 0.4rem;
+}
+.info-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.info-label {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+.info-val {
+  color: var(--text-color);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+/* Graph Panels */
+.pressure-graph {
+  grid-area: pressure;
+}
+.flow-graph {
+  grid-area: flow;
+}
+.command-graph {
+  grid-area: command;
+}
+.feedback-graph {
+  grid-area: feedback;
+}
+
+.graph-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0; /* Allows panel to shrink with grid */
+}
+.chart-container {
+  flex: 1;
+  min-height: 0;
+  min-width: 0; /* Allows chart to dynamically resize */
+  padding: 0.5rem 1rem 1rem 1rem;
+  position: relative;
+}
+
+/* Shared Panel Styles */
+.panel {
+  background: var(--card-bg);
+  border: 1px solid #475569;
+  border-radius: 4px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+}
+.panel-header {
+  padding: 0.65rem 0.8rem;
+  background: rgba(148, 163, 184, 0.045);
+  border-bottom: 1px solid #475569;
+}
+.panel-header h3 {
+  margin: 0;
+  color: var(--text-color);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* Viewer */
+.image-viewer {
+  position: fixed;
+  z-index: 9999;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.9);
+}
+.viewer-header {
+  display: flex;
+  justify-content: space-between;
+  color: white;
+  margin-bottom: 1rem;
+}
+.viewer-content {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  min-height: 0;
+}
+.viewer-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.viewer-close-button {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+:global(:root:not(.p-dark)) .panel,
+:global(:root:not(.p-dark)) .search-toolbar {
+  border-color: #aeb9c4;
+}
+:global(:root:not(.p-dark)) .panel-header {
+  border-color: #c5ced7;
+}
+
+@media (max-width: 1100px) {
+  .wireframe-grid {
+    grid-template-columns: 250px minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    grid-template-areas:
+      "sidebar pressure"
+      "sidebar flow"
+      "sidebar command"
+      "sidebar feedback";
+    overflow-y: auto;
+  }
+}
+@media (max-width: 768px) {
+  .wireframe-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "sidebar"
+      "pressure"
+      "flow"
+      "command"
+      "feedback";
+  }
+  .graph-panel {
+    min-height: 250px;
+  }
+}
+</style>
+</file>
+
+<file path="frontend/src/views/SettingView.vue">
+<script setup>
+import { ref, onMounted, onUnmounted } from "vue";
+import api from "../services/api";
+import InputText from "primevue/inputtext";
+import Password from "primevue/password";
+import Button from "primevue/button";
+import Dropdown from "primevue/dropdown";
+import Toast from "primevue/toast";
+import { useToast } from "primevue/usetoast";
+
+const toast = useToast();
+const loading = ref(false);
+let pollInterval = null;
+
+const settings = ref({
+  opc_ua_address: "",
+  opc_node_pressure: "",
+  opc_node_command: "",
+  opc_node_feedback: "",
+  opc_node_flow: "",
+  opc_node_output: "",
+  opc_ua_username: "",
+  opc_ua_password: "",
+  opc_ua_security_policy: "None",
+  opc_ua_security_mode: "None",
+});
+
+// Connection status state updated to handle objects
+const opcStatus = ref({
+  server: false,
+  command: { connected: false, value: "-" },
+  feedback: { connected: false, value: "-" },
+  pressure: { connected: false, value: "-" },
+  flow: { connected: false, value: "-" },
+  output: { connected: false, value: "-" },
+});
+
+const securityPolicies = ref([
+  { label: "None", value: "None" },
+  { label: "Basic256Sha256", value: "Basic256Sha256" },
+  { label: "Aes128_Sha256_RsaOaep", value: "Aes128_Sha256_RsaOaep" },
+  { label: "Aes256_Sha256_RsaPss", value: "Aes256_Sha256_RsaPss" },
+]);
+
+const securityModes = ref([
+  { label: "None", value: "None" },
+  { label: "Sign", value: "Sign" },
+  { label: "Sign & Encrypt", value: "SignAndEncrypt" },
+]);
+
+async function fetchStatus() {
+  try {
+    const { data } = await api.get("/opcua/status");
+    opcStatus.value = data;
+  } catch (error) {
+    opcStatus.value = {
+      server: false,
+      command: { connected: false, value: "-" },
+      feedback: { connected: false, value: "-" },
+      pressure: { connected: false, value: "-" },
+      flow: { connected: false, value: "-" },
+      output: { connected: false, value: "-" },
+    };
+  }
+}
+
+async function loadSettings() {
+  try {
+    const { data } = await api.get("/settings");
+    settings.value.opc_ua_address = data.opc_ua_address || "";
+    settings.value.opc_node_pressure = data.opc_node_pressure || "";
+    settings.value.opc_node_command = data.opc_node_command || "";
+    settings.value.opc_node_feedback = data.opc_node_feedback || "";
+    settings.value.opc_node_flow = data.opc_node_flow || "";
+    settings.value.opc_node_output = data.opc_node_output || "";
+    settings.value.opc_ua_username = data.opc_ua_username || "";
+    settings.value.opc_ua_security_policy =
+      data.opc_ua_security_policy || "None";
+    settings.value.opc_ua_security_mode = data.opc_ua_security_mode || "None";
+  } catch (error) {
+    toast.add({
+      severity: "error",
+      summary: "Error",
+      detail: "Failed to load settings",
+      life: 3000,
+    });
+  }
+}
+
+async function saveSettings() {
+  loading.value = true;
+  try {
+    await api.put("/settings", settings.value);
+    toast.add({
+      severity: "success",
+      summary: "Success",
+      detail: "Settings saved",
+      life: 3000,
+    });
+    settings.value.opc_ua_password = "";
+    await fetchStatus(); // Force an immediate status check after saving
+  } catch (error) {
+    toast.add({
+      severity: "error",
+      summary: "Error",
+      detail: "Failed to save settings",
+      life: 3000,
+    });
+  } finally {
+    loading.value = false;
+  }
+}
+
+onMounted(() => {
+  loadSettings();
+  fetchStatus();
+  pollInterval = setInterval(fetchStatus, 500);
+});
+
+onUnmounted(() => {
+  if (pollInterval) clearInterval(pollInterval);
+});
+</script>
+
+<template>
+  <div class="settings-page">
+    <Toast />
+    <h2>System Settings</h2>
+
+    <div class="settings-card">
+      <div class="section-title">
+        <span>OPC UA Connection (ctrlX CORE)</span>
+        <div class="server-status">
+          <span class="status-text">{{
+            opcStatus.server ? "Connected" : "Disconnected"
+          }}</span>
+          <span
+            class="status-dot"
+            :class="opcStatus.server ? 'connected' : 'disconnected'"
+            title="Server Status"></span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>OPC-UA Address</label>
+        <InputText
+          v-model="settings.opc_ua_address"
+          placeholder="e.g., opc.tcp://192.168.1.1:4840" />
+      </div>
+
+      <div class="node-grid">
+        <div class="field">
+          <label>Username</label>
+          <InputText
+            v-model="settings.opc_ua_username"
+            placeholder="Leave empty for Anonymous" />
+        </div>
+        <div class="field">
+          <label>Password (Update Only)</label>
+          <Password
+            v-model="settings.opc_ua_password"
+            :feedback="false"
+            toggleMask />
+        </div>
+        <div class="field">
+          <label>Security Policy</label>
+          <Dropdown
+            v-model="settings.opc_ua_security_policy"
+            :options="securityPolicies"
+            optionLabel="label"
+            optionValue="value" />
+        </div>
+        <div class="field">
+          <label>Security Mode</label>
+          <Dropdown
+            v-model="settings.opc_ua_security_mode"
+            :options="securityModes"
+            optionLabel="label"
+            optionValue="value" />
+        </div>
+      </div>
+
+      <div class="section-title mt-4">OPC UA Node Identifiers</div>
+      <div class="node-grid">
+        <div class="field">
+          <div class="label-row">
+            <label>Output Trigger Node ID</label>
+            <span
+              class="status-dot"
+              :class="opcStatus.output.connected ? 'connected' : 'disconnected'"
+              title="Node Status"></span>
+          </div>
+          <div class="input-with-value">
+            <InputText
+              :value="opcStatus.output.value"
+              readonly
+              class="live-value-box"
+              tabindex="-1" />
+            <InputText
+              v-model="settings.opc_node_output"
+              placeholder="ns=2;s=plc/app/Application/sym/PLC_PRG/output" />
+          </div>
+        </div>
+        <div class="field">
+          <div class="label-row">
+            <label>Command Node ID</label>
+            <span
+              class="status-dot"
+              :class="
+                opcStatus.command.connected ? 'connected' : 'disconnected'
+              "
+              title="Node Status"></span>
+          </div>
+          <div class="input-with-value">
+            <InputText
+              :value="opcStatus.command.value"
+              readonly
+              class="live-value-box"
+              tabindex="-1" />
+            <InputText
+              v-model="settings.opc_node_command"
+              placeholder="ns=2;s=testbench/sensors/command" />
+          </div>
+        </div>
+        <div class="field">
+          <div class="label-row">
+            <label>Feedback Node ID</label>
+            <span
+              class="status-dot"
+              :class="
+                opcStatus.feedback.connected ? 'connected' : 'disconnected'
+              "
+              title="Node Status"></span>
+          </div>
+          <div class="input-with-value">
+            <InputText
+              :value="opcStatus.feedback.value"
+              readonly
+              class="live-value-box"
+              tabindex="-1" />
+            <InputText
+              v-model="settings.opc_node_feedback"
+              placeholder="ns=2;s=testbench/sensors/feedback" />
+          </div>
+        </div>
+        <div class="field">
+          <div class="label-row">
+            <label>Pressure Node ID</label>
+            <span
+              class="status-dot"
+              :class="
+                opcStatus.pressure.connected ? 'connected' : 'disconnected'
+              "
+              title="Node Status"></span>
+          </div>
+          <div class="input-with-value">
+            <InputText
+              :value="opcStatus.pressure.value"
+              readonly
+              class="live-value-box"
+              tabindex="-1" />
+            <InputText
+              v-model="settings.opc_node_pressure"
+              placeholder="ns=2;s=testbench/sensors/pressure" />
+          </div>
+        </div>
+        <div class="field">
+          <div class="label-row">
+            <label>Flow Node ID</label>
+            <span
+              class="status-dot"
+              :class="opcStatus.flow.connected ? 'connected' : 'disconnected'"
+              title="Node Status"></span>
+          </div>
+          <div class="input-with-value">
+            <InputText
+              :value="opcStatus.flow.value"
+              readonly
+              class="live-value-box"
+              tabindex="-1" />
+            <InputText
+              v-model="settings.opc_node_flow"
+              placeholder="ns=2;s=testbench/sensors/flow" />
+          </div>
+        </div>
+        <div class="field">
+          <div class="label-row">
+            <label>HPU Status Node ID</label>
+            <span
+              class="status-dot"
+              :class="opcStatus.output.connected ? 'connected' : 'disconnected'"
+              title="Node Status"></span>
+          </div>
+          <div class="input-with-value">
+            <InputText
+              :value="opcStatus.output.value"
+              readonly
+              class="live-value-box"
+              tabindex="-1" />
+            <InputText
+              v-model="settings.opc_node_output"
+              placeholder="ns=2;s=plc/app/Application/sym/PLC_PRG/output" />
+          </div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <Button
+          label="Save Settings"
+          icon="pi pi-save"
+          :loading="loading"
+          @click="saveSettings" />
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.settings-page {
+  padding: 1rem;
+  overflow-y: auto;
+  height: 100%;
+}
+
+h2 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  font-size: 1.5rem;
+}
+
+.settings-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.5rem;
+  max-width: 1200px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  color: var(--primary-color);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.25rem;
+  margin-bottom: -0.25rem;
+}
+
+.server-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.mt-4 {
+  margin-top: 0.5rem;
+}
+
+.node-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem 1.5rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem; /* Tighter label spacing */
+}
+
+.field label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.input-with-value {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.input-with-value > :nth-child(2) {
+  flex: 1;
+}
+
+/* Force PrimeVue inputs to be shorter */
+:deep(.p-inputtext),
+:deep(.p-dropdown),
+:deep(.p-password input) {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
+}
+
+/* Restyled Readonly Value Box */
+.live-value-box {
+  width: 5rem;
+  text-align: center;
+  font-weight: 600;
+  color: var(--primary-color);
+  background-color: rgba(0, 0, 0, 0.03) !important;
+  border: 1px solid var(--border-color);
+}
+
+.p-dark .live-value-box {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Status Indicator Dots */
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #ef4444;
+  transition:
+    background-color 0.3s ease,
+    box-shadow 0.3s ease;
+  flex-shrink: 0;
+}
+.status-dot.connected {
+  background-color: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
+}
+.status-dot.disconnected {
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+}
+
+.actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.25rem;
+}
+
+:deep(.p-button) {
+  padding: 0.4rem 1rem;
+}
+
+@media (max-width: 600px) {
+  .node-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+</file>
+
+</files>

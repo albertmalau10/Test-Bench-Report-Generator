@@ -187,7 +187,7 @@ function toggleRecord() {
 const imageUrl = computed(() => {
   if (!valve.value?.image_path) return null;
   if (valve.value.image_path.startsWith("http")) return valve.value.image_path;
-  const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8080";
+  const baseUrl = window.location.origin;
   return `${baseUrl}${valve.value.image_path}`;
 });
 
