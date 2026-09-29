@@ -63,7 +63,7 @@ const datasheetUrl = computed(() => {
   if (!valve.value?.datasheet_path) return null;
   if (valve.value.datasheet_path.startsWith("http"))
     return valve.value.datasheet_path;
-  const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8080";
+  const baseUrl = window.location.origin;
   return `${baseUrl}${valve.value.datasheet_path}`;
 });
 

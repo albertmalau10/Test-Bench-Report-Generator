@@ -33,10 +33,6 @@ const routes = [
 ]
 
 const router = createRouter({
-  // import.meta.env.BASE_URL follows Vite's `base` config (see
-  // vite.config.js) so client-side navigation still works once the
-  // app is served under /valve-database-app/ behind ctrlX CORE's
-  // reverse proxy, not just at the site root.
   history: createWebHistory(import.meta.env.BASE_URL),
   routes
 })
