@@ -317,26 +317,27 @@ onUnmounted(() => {
 
 <style scoped>
 .settings-page {
-  padding: 1rem;
+  padding: 0.5rem 1.5rem;
   overflow-y: auto;
   height: 100%;
 }
 
 h2 {
   margin-top: 0;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
+  font-size: 1.5rem;
 }
 
 .settings-card {
   background: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  padding: 1.5rem;
+  padding: 1rem 1.25rem;
   max-width: 1200px;
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.5rem; /* Crushed section gaps */
 }
 
 .section-title {
@@ -347,32 +348,38 @@ h2 {
   color: var(--primary-color);
   border-bottom: 1px solid var(--border-color);
   padding-bottom: 0.25rem;
-  margin-bottom: -0.25rem;
+  margin-bottom: 0;
+  font-size: 0.95rem;
 }
 
 .server-status {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
   font-weight: 500;
 }
 
 .mt-4 {
-  margin-top: 0.5rem;
+  margin-top: 0.25rem;
 }
 
 .node-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1rem 1.5rem;
+  gap: 0.4rem 1.5rem; /* Crushed vertical row gaps */
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.15rem; /* Tighter label spacing */
+}
+
+.field label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
 }
 
 .label-row {
@@ -388,6 +395,14 @@ h2 {
 
 .input-with-value > :nth-child(2) {
   flex: 1;
+}
+
+/* Force PrimeVue inputs to be shorter */
+:deep(.p-inputtext),
+:deep(.p-dropdown),
+:deep(.p-password input) {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
 }
 
 /* Restyled Readonly Value Box */
@@ -406,13 +421,11 @@ h2 {
 
 /* Status Indicator Dots */
 .status-dot {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background-color: #ef4444;
-  transition:
-    background-color 0.3s ease,
-    box-shadow 0.3s ease;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
   flex-shrink: 0;
 }
 .status-dot.connected {
@@ -426,7 +439,11 @@ h2 {
 .actions {
   display: flex;
   gap: 1rem;
-  margin-top: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+:deep(.p-button) {
+  padding: 0.4rem 1rem;
 }
 
 @media (max-width: 600px) {
@@ -434,4 +451,4 @@ h2 {
     grid-template-columns: 1fr;
   }
 }
-</style>
+</style> 
