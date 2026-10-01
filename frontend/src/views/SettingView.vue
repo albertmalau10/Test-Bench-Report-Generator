@@ -25,7 +25,7 @@ const settings = ref({
   opc_ua_security_mode: "None",
 });
 
-// Connection status state updated to handle objects
+
 const opcStatus = ref({
   server: false,
   command: { connected: false, value: "-" },
@@ -98,7 +98,7 @@ async function saveSettings() {
       life: 3000,
     });
     settings.value.opc_ua_password = "";
-    await fetchStatus(); // Force an immediate status check after saving
+    await fetchStatus();
   } catch (error) {
     toast.add({
       severity: "error",

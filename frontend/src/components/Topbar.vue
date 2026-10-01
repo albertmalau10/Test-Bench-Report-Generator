@@ -1,9 +1,11 @@
 <script setup>
 import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
 defineEmits(['toggle-sidebar'])
 
+const route = useRoute()
 const authStore = useAuthStore()
 
 const roleLabel = computed(() => {
@@ -11,13 +13,29 @@ const roleLabel = computed(() => {
   if (!role) return ''
   return role.charAt(0).toUpperCase() + role.slice(1)
 })
+
+const pageTitle = computed(() => {
+  switch (route.name) {
+    case 'dashboard': return 'Dashboard'
+    case 'valve-list': return 'Valve Database'
+    case 'valve-details-search':
+    case 'valve-details': return 'Valve Details'
+    case 'records': return 'Test Workspace'
+    case 'settings': return 'System Settings'
+    case 'generate-report': return 'Generate Report'
+    default: return ''
+  }
+})
 </script>
 
 <template>
   <header class="topbar">
-    <button class="icon-btn" @click="$emit('toggle-sidebar')">
-      <i class="pi pi-bars"></i>
-    </button>
+    <div class="topbar-left">
+      <button class="icon-btn" @click="$emit('toggle-sidebar')">
+        <i class="pi pi-bars"></i>
+      </button>
+      <h2 class="page-title">{{ pageTitle }}</h2>
+    </div>
 
     <div class="topbar-right">
       <button class="icon-btn">
@@ -48,6 +66,18 @@ const roleLabel = computed(() => {
   position: sticky;
   top: 0;
   z-index: 10;
+}
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+.page-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--sidebar-text-active); /* Forces the text to be white/cyan depending on the theme */
+  letter-spacing: -0.01em;
 }
 .icon-btn {
   background: none;

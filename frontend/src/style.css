@@ -1,88 +1,64 @@
 /* ============================================================
-   Valve Database App — color theme
-   Repainted to the Bosch Rexroth / ISA-101 high-performance HMI
-   palette: muted, low-saturation backgrounds and status colors,
-   with color reserved for genuine abnormal conditions (alarms) —
-   not for routine "everything is fine" indicators. See the color
-   reference sheet delivered alongside this change for the full
-   swatch + hex + usage table.
+   Valve Database App — Bosch Rexroth Theme
    ============================================================ */
 :root {
-  /* --- Bosch Rexroth base palette --- */
-  --rexroth-1: #A3BAC8;
-  --rexroth-2: #506E81;
-  --rexroth-3: #002B49;
-  --rexroth-4: #ED0007;
-  --rexroth-5: #91F0FF;
-  --rexroth-6: #00C8F7;
+  /* --- Bosch Rexroth Core Palette --- */
+  --rexroth-prussian-blue: #002B49;
+  --rexroth-monza-red: #DF0024;
+  --rexroth-cyan: #00CCFF;
+  --rexroth-smalt-blue: #43545f;
+  --rexroth-casper: #A3BAC8;
 
-  /* --- ISA-101 semantic tokens --- */
-  --bg-main: #D8DEE3;
-  --bg-panel: #C5D0D8;
-  --bg-card: #EEF1F3;
-
-  --bosch-blue: #002B49;
-  --bosch-blue-2: #506E81;
-
-  --normal: #6F7A80;
-  --stopped: #A3BAC8;
-  --out-of-service: #C9CED1;
-
-  --alarm-high: #ED0007;
-  --alarm-medium: #FF8C00;
-  --alarm-warning: #FFD000;
-
-  --info: #00C8F7;
-
-  --text-primary: #1E1E1E;
-  --text-secondary: #4D4D4D;
-
-  /* --- Trend chart roles (RecordsView) --- */
-  --trend-actual: var(--bosch-blue);
-  --trend-setpoint: var(--info);
-  --trend-warning-limit: var(--alarm-warning);
-  --trend-alarm-limit: var(--alarm-high);
-
-  /* --- Legacy variable names kept so existing components need no
-     changes — all aliased onto the ISA-101 tokens above. Sidebar/
-     topbar map onto the Navigation/Header roles (Top Header +
-     Navigation Active), not onto a plain white theme. --- */
-  --bg-color: var(--bg-main);
-  --sidebar-bg: var(--bosch-blue);
-  --sidebar-text: var(--stopped);
+  /* ==========================================================
+     LIGHT THEME (Default)
+     ========================================================== */
+  --bg-color: #8a9297; /* Very light cool gray/blue for app background */
+  --card-bg: #BBBEC0; /* Clean white cards */
+  
+  --text-color: var(--rexroth-prussian-blue); /* Dark blue text for high readability */
+  --text-muted: var(--rexroth-smalt-blue);
+  --border-color: var(--rexroth-casper);
+  
+  /* Navigation (Sidebar & Topbar) */
+  --sidebar-bg: var(--rexroth-prussian-blue); 
+  --sidebar-text: var(--rexroth-casper);
   --sidebar-text-active: #FFFFFF;
-  --sidebar-active-bg: var(--bosch-blue-2);
-  --topbar-bg: var(--bosch-blue);
-  --card-bg: var(--bg-card);
-  --text-color: var(--text-primary);
-  --text-color-secondary: var(--text-secondary);
-  --text-muted: var(--text-secondary);
-  --border-color: var(--stopped);
-  --primary-color: var(--bosch-blue-2);
+  --sidebar-active-bg: var(--rexroth-smalt-blue);
+  --topbar-bg: var(--rexroth-prussian-blue);
+
+  /* Accents & Status */
+  --primary-color: var(--rexroth-prussian-blue);
+  --danger-color: var(--rexroth-monza-red);
+  --info-color: var(--rexroth-cyan);
 }
 
-/* ISA-101 is a fixed, muted industrial scheme by design — a
-   dark/night mode works against its purpose (reduced saturation so
-   real alarms stand out). The light/dark toggle in useTheme.js is
-   left in place (harmless), but .p-dark intentionally resolves to
-   the SAME tokens instead of an inverted dark palette. Flagged to
-   Rami — if a genuine dark/night variant is wanted later, it should
-   still use muted, desaturated colors, not the old slate-blue dark
-   theme this replaced. */
 .p-dark {
-  --bg-color: var(--bg-main);
-  --sidebar-bg: var(--bosch-blue);
-  --sidebar-text: var(--stopped);
-  --sidebar-text-active: #FFFFFF;
-  --sidebar-active-bg: var(--bosch-blue-2);
-  --topbar-bg: var(--bosch-blue);
-  --card-bg: var(--bg-card);
-  --text-color: var(--text-primary);
-  --text-muted: var(--text-secondary);
-  --border-color: var(--stopped);
-  --primary-color: var(--bosch-blue-2);
+  /* ==========================================================
+     DARK THEME (Adjusted to Bosch Rexroth Palette)
+     ========================================================== */
+  --bg-color: #001524; /* Deepened Prussian blue for outer background */
+  --card-bg: #002038; /* Slightly lighter Prussian blue for cards */
+  
+  --text-color: #F4F7F9; /* Off-white text */
+  --text-muted: var(--rexroth-casper); /* Casper blue for muted text */
+  --border-color: var(--rexroth-smalt-blue);
+  
+  /* Navigation (Sidebar & Topbar) */
+  --sidebar-bg: #001B2E; /* Blends into dark background */
+  --sidebar-text: var(--rexroth-casper);
+  --sidebar-text-active: var(--rexroth-cyan); /* Cyan pops beautifully on dark blue */
+  --sidebar-active-bg: var(--rexroth-prussian-blue);
+  --topbar-bg: #001B2E;
+
+  /* Accents & Status */
+  --primary-color: var(--rexroth-cyan);
+  --danger-color: var(--rexroth-monza-red);
+  --info-color: var(--rexroth-cyan);
 }
 
+/* ============================================================
+   Base Element Resets
+   ============================================================ */
 * {
   box-sizing: border-box;
 }
@@ -93,6 +69,7 @@ body {
   font-family: 'Segoe UI', Arial, sans-serif;
   background-color: var(--bg-color);
   color: var(--text-color);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 html, body, #app {
@@ -105,4 +82,9 @@ html, body, #app {
   width: 28px;
   height: 28px;
   object-fit: contain;
+}
+
+/* Smooth transitions for theme switching on main structural classes */
+.card, .dashboard-card, .kpi-card, .settings-card, .panel, .search-toolbar {
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }

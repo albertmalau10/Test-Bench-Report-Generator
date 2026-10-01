@@ -38,3 +38,5 @@ backend/client_key.pem
 *.db-shm
 *.db-wal
 *.bak-darktheme
+
+repomix-output*.xml

@@ -8,6 +8,7 @@ import RecordsView from '../views/RecordsView.vue'
 import SettingView from '../views/SettingView.vue'
 import LoginView from '../views/LoginView.vue'
 import { useAuthStore } from '../stores/auth'
+import GenerateReport from '../views/GenerateReport.vue'
 
 
 
@@ -28,6 +29,7 @@ const routes = [
       { path: 'valves/:id', name: 'valve-details', component: ValveDetailsView },
       { path: 'records', name: 'records', component: RecordsView },
       { path: 'settings', name: 'settings', component: SettingView, meta: { requiresAdmin: true } },
+      { path: 'report', name: 'generate-report', component: GenerateReport },
     ]
   }
 ]
@@ -44,7 +46,6 @@ router.beforeEach((to, from, next) => {
     next({ name: 'login' })
   } else if (to.name === 'login' && authStore.isLoggedIn) {
     next({ name: 'dashboard' })
-  // FIX: Enforce admin role check
   } else if (to.meta.requiresAdmin && !authStore.isAdmin) {
     next({ name: 'dashboard' }) 
   } else {

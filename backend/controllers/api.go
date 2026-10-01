@@ -16,25 +16,20 @@ import (
 )
 
 func Ping(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"message": "ping",
-	})
+	c.JSON(http.StatusOK, gin.H{"message": "ping"})
 }
 
 func CreateValve(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var newValve models.Valve
-
 		if err := c.ShouldBindJSON(&newValve); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-
 		if result := db.Create(&newValve); result.Error != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
 			return
 		}
-
 		c.JSON(http.StatusCreated, newValve)
 	}
 }
@@ -42,12 +37,10 @@ func CreateValve(db *gorm.DB) gin.HandlerFunc {
 func GetValves(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var valves []models.Valve
-
 		if result := db.Find(&valves); result.Error != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
 			return
 		}
-
 		c.JSON(http.StatusOK, valves)
 	}
 }
@@ -55,9 +48,7 @@ func GetValves(db *gorm.DB) gin.HandlerFunc {
 func GetValveByID(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
-
 		var v models.Valve
-
 		result := db.First(&v, id)
 		if result.Error == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "valve tidak ditemukan"})
@@ -66,16 +57,13 @@ func GetValveByID(db *gorm.DB) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
 			return
 		}
-
 		c.JSON(http.StatusOK, v)
 	}
 }
 
-// backend/controllers/api.go
 func UpdateValve(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
-
 		var valve models.Valve
 		if result := db.First(&valve, id); result.Error != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "valve tidak ditemukan"})
@@ -101,21 +89,19 @@ func UpdateValve(db *gorm.DB) gin.HandlerFunc {
 		valve.MaxPressure = updatedValve.MaxPressure
 
 		db.Save(&valve)
-
 		c.JSON(http.StatusOK, valve)
 	}
 }
+
 func DeleteValve(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
-
 		var valve models.Valve
 		if result := db.First(&valve, id); result.Error != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "valve tidak ditemukan"})
 			return
 		}
 
-		// Remove associated files from disk
 		if valve.ImagePath != "" {
 			os.Remove(strings.TrimPrefix(valve.ImagePath, "/"))
 		}
@@ -124,7 +110,6 @@ func DeleteValve(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		db.Delete(&valve)
-
 		c.JSON(http.StatusOK, gin.H{"message": "valve berhasil dihapus"})
 	}
 }
@@ -132,7 +117,6 @@ func DeleteValve(db *gorm.DB) gin.HandlerFunc {
 func UploadValveImage(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
-
 		var valve models.Valve
 		if result := db.First(&valve, id); result.Error != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "valve tidak ditemukan"})
@@ -145,45 +129,20 @@ func UploadValveImage(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// Extract and validate the file extension (Security Fix)
 		ext := strings.ToLower(filepath.Ext(file.Filename))
-
-		allowedExts := map[string]bool{
-			".jpg":  true,
-			".jpeg": true,
-			".png":  true,
-			".webp": true,
-		}
+		allowedExts := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".webp": true}
 
 		if !allowedExts[ext] {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "format file tidak diizinkan. Gunakan JPG, PNG, atau WEBP.",
-			})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "format file tidak diizinkan. Gunakan JPG, PNG, atau WEBP."})
 			return
 		}
 
 		mimeType, err := detectMimeType(file)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "gagal memeriksa file",
-			})
+		if err != nil || (mimeType != "image/jpeg" && mimeType != "image/png" && mimeType != "image/webp") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "MIME type tidak valid"})
 			return
 		}
 
-		allowedMime := map[string]bool{
-			"image/jpeg": true,
-			"image/png":  true,
-			"image/webp": true,
-		}
-
-		if !allowedMime[mimeType] {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "MIME type tidak valid",
-			})
-			return
-		}
-
-		// Remove old image if it exists before saving the new one
 		if valve.ImagePath != "" {
 			os.Remove(strings.TrimPrefix(valve.ImagePath, "/"))
 		}
@@ -198,7 +157,6 @@ func UploadValveImage(db *gorm.DB) gin.HandlerFunc {
 
 		valve.ImagePath = "/images/" + newFileName
 		db.Save(&valve)
-
 		c.JSON(http.StatusOK, valve)
 	}
 }
@@ -206,7 +164,6 @@ func UploadValveImage(db *gorm.DB) gin.HandlerFunc {
 func UploadValveDatasheet(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
-
 		var valve models.Valve
 		if result := db.First(&valve, id); result.Error != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "valve tidak ditemukan"})
@@ -220,30 +177,17 @@ func UploadValveDatasheet(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		ext := strings.ToLower(filepath.Ext(file.Filename))
-
 		if ext != ".pdf" {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "file harus berformat PDF",
-			})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "file harus berformat PDF"})
 			return
 		}
 
 		mimeType, err := detectMimeType(file)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "gagal memeriksa file",
-			})
+		if err != nil || mimeType != "application/pdf" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "file bukan PDF valid"})
 			return
 		}
 
-		if mimeType != "application/pdf" {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "file bukan PDF valid",
-			})
-			return
-		}
-
-		// Remove old datasheet if it exists before saving the new one
 		if valve.DatasheetPath != "" {
 			os.Remove(strings.TrimPrefix(valve.DatasheetPath, "/"))
 		}
@@ -258,13 +202,11 @@ func UploadValveDatasheet(db *gorm.DB) gin.HandlerFunc {
 
 		valve.DatasheetPath = "/datasheets/" + newFileName
 		db.Save(&valve)
-
 		c.JSON(http.StatusOK, valve)
 	}
 }
 
 func detectMimeType(fileHeader *multipart.FileHeader) (string, error) {
-
 	file, err := fileHeader.Open()
 	if err != nil {
 		return "", err
@@ -272,11 +214,36 @@ func detectMimeType(fileHeader *multipart.FileHeader) (string, error) {
 	defer file.Close()
 
 	buffer := make([]byte, 512)
-
 	_, err = file.Read(buffer)
 	if err != nil {
 		return "", err
 	}
 
 	return http.DetectContentType(buffer), nil
+}
+
+func SaveTestRecord(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var record models.TestRecord
+		if err := c.ShouldBindJSON(&record); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if err := db.Create(&record).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusCreated, record)
+	}
+}
+
+func GetTestRecords(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var records []models.TestRecord
+		if err := db.Preload("Valve").Order("created_at desc").Find(&records).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, records)
+	}
 }

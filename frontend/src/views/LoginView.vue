@@ -260,19 +260,32 @@ async function handleLogin() {
   display: grid;
   place-items: center;
   padding: 2rem;
-  color: var(--text-primary);
-  background-color: var(--bg-main);
+  color: var(--text-color);
+  background-color: var(--bg-color);
   background-image:
     linear-gradient(
-      rgba(0, 43, 73, 0.035) 1px,
+      rgba(0, 43, 73, 0.05) 1px,
       transparent 1px
     ),
     linear-gradient(
       90deg,
-      rgba(0, 43, 73, 0.035) 1px,
+      rgba(0, 43, 73, 0.05) 1px,
       transparent 1px
     );
   background-size: 32px 32px;
+}
+
+.p-dark .login-page {
+  background-image:
+    linear-gradient(
+      rgba(255, 255, 255, 0.03) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.03) 1px,
+      transparent 1px
+    );
 }
 
 .login-shell {
@@ -281,21 +294,20 @@ async function handleLogin() {
   display: grid;
   grid-template-columns: 42% 58%;
   overflow: hidden;
-  background: var(--bg-card);
-  border: 1px solid var(--stopped);
-  border-radius: 4px;
-  box-shadow: 0 24px 60px rgba(0, 43, 73, 0.14);
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
 }
 
 /* Left system panel */
-
 .system-panel {
   min-width: 0;
   display: flex;
   flex-direction: column;
   padding: 2.25rem;
-  background: var(--bosch-blue);
-  border-right: 1px solid var(--bosch-blue-2);
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border-color);
 }
 
 .system-brand {
@@ -312,8 +324,8 @@ async function handleLogin() {
   place-items: center;
   overflow: hidden;
   background: #ffffff;
-  border: 1px solid var(--bosch-blue-2);
-  border-radius: 3px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
 }
 
 .brand-logo {
@@ -330,12 +342,8 @@ async function handleLogin() {
   gap: 0.22rem;
 }
 
-/* Brand text sits on two different backgrounds: the navy
-   system-panel (desktop) and the white form-panel (mobile, <760px,
-   see .mobile-brand below) — each needs its own contrast pair
-   rather than one shared color. */
 .system-brand .brand-label {
-  color: var(--stopped);
+  color: var(--text-muted);
   font-family: Consolas, Monaco, monospace;
   font-size: 0.62rem;
   letter-spacing: 0.16em;
@@ -349,14 +357,14 @@ async function handleLogin() {
 }
 
 .mobile-brand .brand-label {
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-family: Consolas, Monaco, monospace;
   font-size: 0.62rem;
   letter-spacing: 0.16em;
 }
 
 .mobile-brand .brand-copy strong {
-  color: var(--text-primary);
+  color: var(--text-color);
   font-size: 0.88rem;
   font-weight: 600;
   line-height: 1.35;
@@ -369,7 +377,7 @@ async function handleLogin() {
 
 .section-index {
   margin: 0 0 1rem;
-  color: var(--info);
+  color: var(--info-color);
   font-family: Consolas, Monaco, monospace;
   font-size: 0.68rem;
   font-weight: 600;
@@ -389,14 +397,14 @@ async function handleLogin() {
 .system-description {
   max-width: 21rem;
   margin: 1.25rem 0 0;
-  color: var(--stopped);
+  color: var(--rexroth-casper);
   font-size: 0.86rem;
   line-height: 1.75;
 }
 
 .system-information {
   margin: 2.6rem 0 0;
-  border-top: 1px solid var(--bosch-blue-2);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .information-row {
@@ -404,11 +412,11 @@ async function handleLogin() {
   grid-template-columns: 6rem 1fr;
   min-height: 2.7rem;
   align-items: center;
-  border-bottom: 1px solid var(--bosch-blue-2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .information-row dt {
-  color: var(--stopped);
+  color: var(--rexroth-casper);
   font-family: Consolas, Monaco, monospace;
   font-size: 0.68rem;
   letter-spacing: 0.05em;
@@ -427,28 +435,27 @@ async function handleLogin() {
 .status-indicator {
   width: 7px;
   height: 7px;
-  background: var(--info);
+  background: var(--info-color);
   border-radius: 50%;
 }
 
 .system-footer {
   display: flex;
   justify-content: space-between;
-  color: var(--stopped);
+  color: var(--rexroth-casper);
   font-family: Consolas, Monaco, monospace;
   font-size: 0.65rem;
   letter-spacing: 0.04em;
 }
 
 /* Right form panel */
-
 .form-panel {
   min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 3.5rem;
-  background: #ffffff;
+  background: var(--card-bg);
 }
 
 .mobile-brand {
@@ -466,7 +473,7 @@ async function handleLogin() {
 
 .form-code {
   margin: 0 0 0.85rem;
-  color: var(--bosch-blue-2);
+  color: var(--info-color);
   font-family: Consolas, Monaco, monospace;
   font-size: 0.68rem;
   font-weight: 600;
@@ -475,7 +482,7 @@ async function handleLogin() {
 
 .form-header h2 {
   margin: 0 0 0.5rem;
-  color: var(--text-primary);
+  color: var(--text-color);
   font-size: 1.75rem;
   font-weight: 600;
   letter-spacing: -0.025em;
@@ -483,7 +490,7 @@ async function handleLogin() {
 
 .form-header p {
   margin: 0;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-size: 0.84rem;
   line-height: 1.6;
 }
@@ -501,7 +508,7 @@ async function handleLogin() {
 }
 
 .field label {
-  color: var(--text-primary);
+  color: var(--text-color);
   font-size: 0.77rem;
   font-weight: 600;
 }
@@ -516,14 +523,14 @@ async function handleLogin() {
   z-index: 2;
   top: 50%;
   left: 0.95rem;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-size: 0.86rem;
   pointer-events: none;
   transform: translateY(-50%);
 }
 
 .control-wrapper:focus-within .control-icon {
-  color: var(--info);
+  color: var(--primary-color);
 }
 
 .text-control {
@@ -535,36 +542,33 @@ async function handleLogin() {
   width: 100%;
   height: 46px;
   padding-left: 2.65rem;
-  color: var(--text-primary);
-  background: #ffffff;
-  border: 1px solid var(--stopped);
-  border-radius: 3px;
+  color: var(--text-color);
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
   font-size: 0.85rem;
   box-shadow: none;
-  transition:
-    border-color 0.15s ease,
-    background-color 0.15s ease;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
 .control-wrapper :deep(.p-inputtext::placeholder),
 .control-wrapper :deep(.password-input::placeholder) {
-  color: var(--text-secondary);
+  color: var(--text-muted);
 }
 
 .control-wrapper :deep(.p-inputtext:hover),
 .control-wrapper :deep(.password-input:hover) {
-  border-color: var(--bosch-blue-2);
+  border-color: var(--primary-color);
 }
 
 .control-wrapper :deep(.p-inputtext:focus),
 .control-wrapper :deep(.password-input:focus) {
-  background: #ffffff;
-  border-color: var(--info);
-  box-shadow: 0 0 0 2px rgba(0, 200, 247, 0.16);
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(0, 204, 255, 0.2);
 }
 
 .control-wrapper :deep(.p-invalid) {
-  border-color: var(--alarm-high);
+  border-color: var(--danger-color);
 }
 
 .password-control {
@@ -580,11 +584,11 @@ async function handleLogin() {
 }
 
 .password-control :deep(.p-password-toggle-mask-icon) {
-  color: var(--text-secondary);
+  color: var(--text-muted);
 }
 
 .field-error {
-  color: var(--alarm-high);
+  color: var(--danger-color);
   font-size: 0.7rem;
 }
 
@@ -593,15 +597,15 @@ async function handleLogin() {
   align-items: flex-start;
   gap: 0.7rem;
   padding: 0.85rem;
-  color: #8a2020;
-  background: #fdecec;
-  border-left: 3px solid var(--alarm-high);
+  color: #ff8080;
+  background: rgba(223, 0, 36, 0.1);
+  border-left: 3px solid var(--danger-color);
   border-radius: 2px;
 }
 
 .authentication-error > i {
   margin-top: 0.12rem;
-  color: var(--alarm-high);
+  color: var(--danger-color);
   font-size: 0.85rem;
 }
 
@@ -612,13 +616,12 @@ async function handleLogin() {
 }
 
 .authentication-error strong {
-  color: var(--alarm-high);
+  color: var(--danger-color);
   font-size: 0.75rem;
   font-weight: 600;
 }
 
 .authentication-error span {
-  color: #8a2020;
   font-size: 0.7rem;
   line-height: 1.45;
 }
@@ -629,16 +632,14 @@ async function handleLogin() {
   margin-top: 0.2rem;
   display: flex;
   justify-content: space-between;
-  color: var(--bosch-blue);
-  background: var(--info);
-  border: 1px solid var(--info);
-  border-radius: 3px;
+  color: #001524;
+  background: var(--info-color);
+  border: 1px solid var(--info-color);
+  border-radius: 4px;
   font-size: 0.82rem;
   font-weight: 700;
   box-shadow: none;
-  transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .login-button:not(:disabled):hover {
@@ -646,26 +647,19 @@ async function handleLogin() {
   border-color: #33d6ff;
 }
 
-.login-button:not(:disabled):active {
-  background: #00a8d1;
-  border-color: #00a8d1;
-}
-
 .form-footer {
   display: flex;
   align-items: center;
   gap: 0.45rem;
   margin-top: 1.5rem;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-size: 0.68rem;
 }
 
 .form-footer i {
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-size: 0.72rem;
 }
-
-/* Responsive */
 
 @media (max-width: 760px) {
   .login-page {

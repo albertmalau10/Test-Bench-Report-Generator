@@ -16,11 +16,12 @@ import (
 	"sync"
 	"time"
 
+	"valve_database/models"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/ua"
 	"gorm.io/gorm"
-	"valve_database/models"
 )
 
 var (
@@ -28,12 +29,14 @@ var (
 	opcMutex  sync.Mutex
 )
 
-// ResetOpcConnection terminates the current persistent connection
+// ResetOpcConnection terminates the current persistent connection with a strict timeout
 func ResetOpcConnection() {
 	opcMutex.Lock()
 	defer opcMutex.Unlock()
 	if opcClient != nil {
-		opcClient.Close(context.Background())
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cancel()
+		_ = opcClient.Close(ctx)
 		opcClient = nil
 	}
 }
@@ -86,8 +89,8 @@ func ensureClientCert() ([]byte, *rsa.PrivateKey, error) {
 		return nil, nil, err
 	}
 
-	os.WriteFile(certFile, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes}), 0600)
-	os.WriteFile(keyFile, pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)}), 0600)
+	_ = os.WriteFile(certFile, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes}), 0600)
+	_ = os.WriteFile(keyFile, pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)}), 0600)
 
 	return derBytes, priv, nil
 }
@@ -96,12 +99,12 @@ func getPersistentClient(ctx context.Context, s models.Settings) (*opcua.Client,
 	opcMutex.Lock()
 	defer opcMutex.Unlock()
 
-	// Use the persistent connection if it already exists
+	// Use existing persistent connection if healthy
 	if opcClient != nil {
 		if isClientHealthy(ctx, opcClient) {
 			return opcClient, nil
 		}
-		opcClient.Close(ctx)
+		_ = opcClient.Close(ctx)
 		opcClient = nil
 	}
 
@@ -124,14 +127,11 @@ func getPersistentClient(ctx context.Context, s models.Settings) (*opcua.Client,
 
 	endpoints, err := opcua.GetEndpoints(ctx, s.OpcUaAddress)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get endpoints: %v", err)
+		return nil, fmt.Errorf("failed to get endpoints: %w", err)
 	}
 
 	ep, err := opcua.SelectEndpoint(endpoints, policyURI, mode)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find suitable endpoint for policy %s and mode %v: %v", policyURI, mode, err)
-	}
-	if ep == nil {
+	if err != nil || ep == nil {
 		return nil, fmt.Errorf("failed to find suitable endpoint for policy %s and mode %v", policyURI, mode)
 	}
 
@@ -144,7 +144,7 @@ func getPersistentClient(ctx context.Context, s models.Settings) (*opcua.Client,
 	if mode != ua.MessageSecurityModeNone {
 		cert, privKey, err := ensureClientCert()
 		if err != nil {
-			return nil, fmt.Errorf("failed to load/generate client cert: %v", err)
+			return nil, fmt.Errorf("failed to load/generate client cert: %w", err)
 		}
 		opts = append(opts, opcua.Certificate(cert), opcua.PrivateKey(privKey))
 	}
@@ -159,11 +159,11 @@ func getPersistentClient(ctx context.Context, s models.Settings) (*opcua.Client,
 
 	client, err := opcua.NewClient(ep.EndpointURL, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create client: %v", err)
+		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
 
 	if err := client.Connect(ctx); err != nil {
-		return nil, fmt.Errorf("failed to connect client: %v", err)
+		return nil, fmt.Errorf("failed to connect client: %w", err)
 	}
 
 	opcClient = client
@@ -175,13 +175,14 @@ func GetOpcData(db *gorm.DB) gin.HandlerFunc {
 		var s models.Settings
 		db.First(&s, 1)
 
-		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
 		client, err := getPersistentClient(ctx, s)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to connect: " + err.Error()})
 			return
 		}
-		// No more defer client.Close(ctx) here to keep the connection open
 
 		readNode := func(nodeID string) interface{} {
 			if nodeID == "" {
@@ -216,10 +217,12 @@ func writeBoolNode(db *gorm.DB, value bool) error {
 	db.First(&s, 1)
 
 	if s.OpcNodeOutput == "" {
-		return fmt.Errorf("Output Node ID is not configured")
+		return fmt.Errorf("output Node ID is not configured")
 	}
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
 	client, err := getPersistentClient(ctx, s)
 	if err != nil {
 		return err
@@ -248,7 +251,7 @@ func writeBoolNode(db *gorm.DB, value bool) error {
 	if err != nil {
 		return err
 	}
-	if res.Results[0] != ua.StatusOK {
+	if len(res.Results) == 0 || res.Results[0] != ua.StatusOK {
 		return fmt.Errorf("OPC UA write failed with status: %v", res.Results[0])
 	}
 	return nil
@@ -293,7 +296,9 @@ func GetOpcStatus(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
 		client, err := getPersistentClient(ctx, s)
 		if err != nil {
 			log.Printf("OPC UA Connection Failed: %v\n", err)
@@ -337,7 +342,6 @@ func GetOpcStatus(db *gorm.DB) gin.HandlerFunc {
 }
 
 func isClientHealthy(ctx context.Context, client *opcua.Client) bool {
-
 	if client == nil {
 		return false
 	}
@@ -352,12 +356,7 @@ func isClientHealthy(ctx context.Context, client *opcua.Client) bool {
 	}
 
 	resp, err := client.Read(ctx, req)
-
-	if err != nil {
-		return false
-	}
-
-	if len(resp.Results) == 0 {
+	if err != nil || len(resp.Results) == 0 {
 		return false
 	}
 

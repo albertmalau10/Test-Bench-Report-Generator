@@ -2,11 +2,12 @@ import axios from "axios";
 import { useAuthStore } from "../stores/auth";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "/api",
+  
+  baseURL: import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : 'http://localhost:8080/api',
   headers: {
-    "Content-Type": "application/json",
-  },
-});
+    'Content-Type': 'application/json'
+  }
+})
 
 api.interceptors.request.use((config) => {
   const authStore = useAuthStore();
@@ -49,7 +50,7 @@ export function uploadValveDatasheet(id, file) {
 }
 
 export function startOutput() {
-  return api.post("/ctrlx/start"); // Route kept same for minimal disruption
+  return api.post("/ctrlx/start");
 }
 
 export function stopOutput() {

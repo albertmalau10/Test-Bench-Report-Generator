@@ -3,6 +3,7 @@ package controllers
 import (
 	"net/http"
 	"valve_database/models"
+
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -59,6 +60,7 @@ func UpdateSettings(db *gorm.DB) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal simpan settings: " + err.Error()})
 			return
 		}
+		
 		ResetOpcConnection()
 		c.JSON(http.StatusOK, s)
 	}
