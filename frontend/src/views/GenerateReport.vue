@@ -36,7 +36,7 @@ const toast = useToast();
 const historicalRecords = ref([]);
 const selectedRecord = ref(null);
 const docNumber = ref("");
-const operatorName = ref("Hanif Ahmadzakir, A.Md.I.Kom., S.Kom.");
+const operatorName = ref("");
 const selectedStatus = ref("OK");
 const statusOptions = [
   { label: "OK (Passed)", value: "OK" },
