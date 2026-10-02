@@ -5,6 +5,7 @@ import InputText from "primevue/inputtext";
 import Dropdown from "primevue/dropdown";
 import Button from "primevue/button";
 import { useToast } from "primevue/usetoast";
+import rexrothLogo from "../assets/Bosch_Rexroth-Logo.wine.svg";
 
 import { Line } from "vue-chartjs";
 import {
@@ -45,7 +46,9 @@ const statusOptions = [
 ];
 
 // Computed Data Extraction
-const valve = computed(() => selectedRecord.value?.Valve || null);
+const valve = computed(
+  () => selectedRecord.value?.valve || selectedRecord.value?.Valve || null,
+);
 
 const reportDate = computed(() => {
   if (!selectedRecord.value) return "-";
@@ -60,10 +63,13 @@ const reportDate = computed(() => {
 });
 
 const recordOptions = computed(() => {
-  return historicalRecords.value.map((r) => ({
-    label: `${r.Valve?.part_number || "Unknown"} — ${new Date(r.created_at).toLocaleString("en-GB")}`,
-    value: r,
-  }));
+  return historicalRecords.value.map((r) => {
+    const v = r.valve || r.Valve;
+    return {
+      label: `${v?.part_number || "Unknown"} — ${new Date(r.created_at).toLocaleString("en-GB")}`,
+      value: r,
+    };
+  });
 });
 
 // Parse the saved telemetry JSON
@@ -76,33 +82,61 @@ const parsedTelemetry = computed(() => {
   }
 });
 
-// Dynamic Parameter Verification
+// Dynamic Parameter Verification with ±10% Acceptance Band
+
+// 1. Peak recorded values must be declared first
 const maxRecordedPressure = computed(() => {
-  if (!parsedTelemetry.value.length) return 0;
-  return Math.max(
-    ...parsedTelemetry.value.map((d) => Number(d.pressure)),
-  ).toFixed(1);
+  if (!parsedTelemetry.value.length) return "0.0";
+  return Math.max(...parsedTelemetry.value.map((d) => Number(d.pressure || 0))).toFixed(1);
 });
 
 const maxRecordedFlow = computed(() => {
-  if (!parsedTelemetry.value.length) return 0;
-  return Math.max(...parsedTelemetry.value.map((d) => Number(d.flow))).toFixed(
-    1,
-  );
+  if (!parsedTelemetry.value.length) return "0.0";
+  return Math.max(...parsedTelemetry.value.map((d) => Number(d.flow || 0))).toFixed(1);
 });
 
+// 2. Tolerance band calculations (±10%)
+const TOLERANCE_PCT = 0.10;
+
+const pressureRange = computed(() => {
+  if (!valve.value?.max_pressure) return { min: 0, max: 0, str: "-" };
+  const refVal = Number(valve.value.max_pressure);
+  const min = (refVal * (1 - TOLERANCE_PCT)).toFixed(1);
+  const max = (refVal * (1 + TOLERANCE_PCT)).toFixed(1);
+  return { min: Number(min), max: Number(max), str: `${min} - ${max} bar` };
+});
+
+const flowRange = computed(() => {
+  if (!valve.value?.max_flow) return { min: 0, max: 0, str: "-" };
+  const refVal = Number(valve.value.max_flow);
+  const min = (refVal * (1 - TOLERANCE_PCT)).toFixed(1);
+  const max = (refVal * (1 + TOLERANCE_PCT)).toFixed(1);
+  return { min: Number(min), max: Number(max), str: `${min} - ${max} L/min` };
+});
+
+// 3. Status checks consuming the peak values
 const pressureVerification = computed(() => {
-  if (!valve.value) return "-";
-  return Number(maxRecordedPressure.value) <= valve.value.max_pressure
-    ? "Within Tolerance"
-    : "Exceeded Limits";
+  if (!valve.value || !parsedTelemetry.value.length) return "No Data";
+  const peak = Number(maxRecordedPressure.value);
+  const refVal = Number(valve.value.max_pressure);
+
+  if (refVal <= 0) return "Invalid Ref";
+  if (peak <= 0.5) return "No Pressure (Failed)";
+  if (peak > refVal * (1 + TOLERANCE_PCT)) return "Exceeded Limits";
+  if (peak < refVal * (1 - TOLERANCE_PCT)) return "Below Tolerance";
+  return "Within Tolerance";
 });
 
 const flowVerification = computed(() => {
-  if (!valve.value) return "-";
-  return Number(maxRecordedFlow.value) <= valve.value.max_flow
-    ? "Within Tolerance"
-    : "Exceeded Limits";
+  if (!valve.value || !parsedTelemetry.value.length) return "No Data";
+  const peak = Number(maxRecordedFlow.value);
+  const refVal = Number(valve.value.max_flow);
+
+  if (refVal <= 0) return "Not Configured";
+  if (peak <= 0.5) return "No Flow (Failed)";
+  if (peak > refVal * (1 + TOLERANCE_PCT)) return "Exceeded Limits";
+  if (peak < refVal * (1 - TOLERANCE_PCT)) return "Below Tolerance";
+  return "Within Tolerance";
 });
 
 // Chart Bindings
@@ -170,7 +204,7 @@ const chartOptions = {
   animation: false,
   plugins: {
     legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 9 } } },
-    tooltip: { enabled: false }, 
+    tooltip: { enabled: false },
   },
   scales: {
     x: {
@@ -289,12 +323,13 @@ onMounted(() => {
         <!-- Report Header -->
         <header class="report-header">
           <div class="brand-block">
-            <h1 class="brand-title">Bosch Rexroth</h1>
-            <span class="brand-subtitle">Industrial Hydraulics</span>
+            <img :src="rexrothLogo" alt="Bosch Rexroth" class="report-logo" />
           </div>
           <div class="doc-title">
             <h2>VALVE TEST REPORT</h2>
-            <span class="doc-id">{{ docNumber || "PENDING" }}</span>
+            <span class="doc-id">{{
+              docNumber || "Please input doc number"
+            }}</span>
           </div>
         </header>
 
@@ -313,7 +348,7 @@ onMounted(() => {
             </div>
             <div class="info-row">
               <span class="label">Test System:</span>
-              <span class="value">ctrlX CORE Test Bench</span>
+              <span class="value">ValveDAX</span>
             </div>
           </div>
           <div class="info-column status-column">
@@ -362,17 +397,21 @@ onMounted(() => {
           <table class="spec-table verification-table">
             <thead>
               <tr>
-                <th>Parameter</th>
-                <th>Database Reference</th>
-                <th>Peak Recorded Value</th>
-                <th>Deviation Status</th>
+                <th width="22%">Parameter</th>
+                <th width="20%">Database Nominal</th>
+                <th width="22%">Acceptable Band (±10%)</th>
+                <th width="18%">Peak Recorded Value</th>
+                <th width="18%">Verification Status</th>
               </tr>
             </thead>
             <tbody>
               <tr>
                 <td>Max Pressure</td>
                 <td>{{ valve.max_pressure }} bar</td>
-                <td>{{ maxRecordedPressure }} bar</td>
+                <td>{{ pressureRange.str }}</td>
+                <td>
+                  <strong>{{ maxRecordedPressure }} bar</strong>
+                </td>
                 <td
                   :class="
                     pressureVerification === 'Within Tolerance'
@@ -385,38 +424,42 @@ onMounted(() => {
               <tr>
                 <td>Max Flow</td>
                 <td>{{ valve.max_flow }} L/min</td>
-                <td>{{ maxRecordedFlow }} L/min</td>
+                <td>{{ flowRange.str }}</td>
+                <td>
+                  <strong>{{ maxRecordedFlow }} L/min</strong>
+                </td>
                 <td
                   :class="
                     flowVerification === 'Within Tolerance'
                       ? 'text-ok'
-                      : 'text-fail'
+                      : flowVerification === 'Not Configured'
+                        ? ''
+                        : 'text-fail'
                   ">
                   {{ flowVerification }}
                 </td>
               </tr>
               <tr>
                 <td>Command Input Type</td>
-                <td>{{ valve.command_type || "Voltage" }}</td>
-                <td>{{ valve.command_type || "Voltage" }}</td>
+                <td>{{ valve.command_type || "Voltage (0-10V)" }}</td>
+                <td>Match Database Type</td>
+                <td>{{ valve.command_type || "Voltage (0-10V)" }}</td>
                 <td class="text-ok">Matched</td>
               </tr>
             </tbody>
           </table>
         </section>
 
-        <!-- Performance Graphs -->
+        <!-- Performance Graphs (Compact Side-by-Side Grid) -->
         <section class="graphs-section" v-if="parsedTelemetry.length > 0">
           <h3>3. Dynamic Test Telemetry</h3>
-          <div class="graph-row">
+          <div class="graphs-grid">
             <div class="graph-box">
               <h4>Hydraulic Performance (Pressure & Flow)</h4>
               <div class="chart-wrapper">
                 <Line :data="hydraulicChartData" :options="chartOptions" />
               </div>
             </div>
-          </div>
-          <div class="graph-row mt-4">
             <div class="graph-box">
               <h4>Electrical Response (Command vs Feedback)</h4>
               <div class="chart-wrapper">
@@ -543,97 +586,111 @@ onMounted(() => {
   overflow-y: auto;
   display: flex;
   justify-content: center;
-  padding: 1rem;
-  background: rgba(0, 0, 0, 0.02);
+  padding: 1.5rem 1rem;
+  background: rgba(0, 0, 0, 0.04);
 }
 
 .a4-paper {
   width: 210mm;
   min-height: 297mm;
+  max-width: 210mm;
   background: white;
-  padding: 15mm 20mm;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 12mm 15mm;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18);
   color: #000;
   font-family: "Segoe UI", Arial, sans-serif;
-  margin: 0 auto;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 
-/* Report Internal Styling (Strictly Black/Dark Blue for printing) */
+/* Report Header */
 .report-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 1rem;
+  align-items: center;
+  margin-bottom: 0.35rem; /* Reduced to balance the larger logo */
 }
-.brand-title {
-  margin: 0;
-  font-size: 2rem;
-  font-weight: 900;
-  color: #002b49;
-  letter-spacing: -1px;
+
+.brand-block {
+  display: flex;
+  align-items: center;
 }
-.brand-subtitle {
-  font-size: 0.9rem;
-  color: #43545f;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1px;
+
+.report-logo {
+  height: 100px;
+  width: auto;
+  max-width: 280px; /* Constrains width so it doesn't push the title off-screen */
+  object-fit: contain;
+  display: block;
 }
+
 .doc-title {
   text-align: right;
 }
+
 .doc-title h2 {
   margin: 0;
-  font-size: 1.4rem;
+  font-size: 1.3rem;
   color: #002b49;
+  letter-spacing: -0.01em;
 }
+
 .doc-id {
   font-family: Consolas, monospace;
-  font-size: 0.85rem;
-  color: #666;
-  font-weight: bold;
+  font-size: 0.8rem;
+  color: #555;
+  font-weight: 700;
 }
 
 .divider {
   border: none;
   border-top: 2px solid #002b49;
-  margin: 0 0 1.5rem 0;
+  margin: 0 0 0.5rem 0; /* Tightened */
 }
 
+/* Info Row */
 .info-section {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 1.5rem;
-  font-size: 0.9rem;
+  align-items: center;
+  margin-bottom: 0.5rem; /* Tightened */
+  font-size: 0.8rem;
 }
+
 .info-column {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.25rem;
 }
+
 .info-row {
   display: flex;
   gap: 0.5rem;
 }
+
 .info-row .label {
-  width: 100px;
+  width: 85px;
   font-weight: 600;
   color: #43545f;
 }
+
 .info-row .value {
   font-weight: 500;
 }
+
 .status-column {
   align-items: flex-end;
 }
 
 .status-badge {
-  padding: 0.2rem 0.6rem;
+  padding: 0.15rem 0.55rem;
   border-radius: 4px;
   font-weight: 700;
-  font-size: 1.1rem;
-  border: 2px solid #000;
+  font-size: 0.95rem;
+  border: 1.5px solid #000;
 }
+
 .status-badge.OK {
   color: #10b981;
   border-color: #10b981;
@@ -648,75 +705,100 @@ onMounted(() => {
 }
 
 h3 {
-  font-size: 1.1rem;
+  font-size: 0.95rem;
   color: #002b49;
-  border-bottom: 1px solid #ccc;
-  padding-bottom: 0.25rem;
-  margin: 0 0 0.75rem 0;
+  border-bottom: 1px solid #cbd5e1;
+  padding-bottom: 0.2rem;
+  margin: 0 0 0.45rem 0;
+}
+
+/* Tables */
+.spec-section {
+  margin-bottom: 0.5rem; /* Tightened */
 }
 
 .spec-table {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 1.5rem;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
 }
+
 .spec-table th,
 .spec-table td {
-  border: 1px solid #ddd;
-  padding: 0.4rem 0.6rem;
+  border: 1px solid #cbd5e1;
+  padding: 0.3rem 0.5rem;
   text-align: left;
 }
+
 .spec-table th {
   background: #f8fafc;
   font-weight: 600;
   color: #43545f;
 }
+
 .text-ok {
   color: #10b981;
   font-weight: 600;
 }
+
 .text-fail {
   color: #ef4444;
   font-weight: 600;
 }
 
+/* Dynamic Telemetry Graphs (Side-by-Side) */
 .graphs-section {
-  margin-bottom: 2rem;
-}
-.graph-box h4 {
-  margin: 0 0 0.5rem 0;
-  font-size: 0.85rem;
-  color: #43545f;
-}
-.chart-wrapper {
-  height: 200px;
-  width: 100%;
-  border: 1px solid #eee;
-  padding: 0.5rem;
+  margin-bottom: 0.5rem; /* Tightened */
 }
 
+.graphs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.graph-box h4 {
+  margin: 0 0 0.3rem 0;
+  font-size: 0.75rem;
+  color: #43545f;
+}
+
+.chart-wrapper {
+  height: 135px; /* Slightly reduced height (from 145px) to absorb the extra logo height */
+  width: 100%;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 0.3rem;
+  background: #fafafa;
+}
+
+/* Signatures */
 .signature-section {
   display: flex;
   justify-content: space-between;
-  margin-top: 3rem;
+  margin-top: auto; /* Pushes signatures directly to the bottom of the A4 page without spilling */
+  padding-top: 1.25rem;
+  page-break-inside: avoid;
 }
+
 .sig-box {
-  width: 40%;
+  width: 38%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.85rem;
+  gap: 0.3rem;
+  font-size: 0.78rem;
 }
+
 .sig-line {
   width: 100%;
   border-bottom: 1px solid #000;
-  margin-top: 2rem;
+  margin-top: 1.75rem;
 }
+
 .sig-name {
   font-weight: 600;
-  min-height: 1.2rem;
+  min-height: 1.1rem;
 }
 
 /* PRINT MEDIA QUERIES */
@@ -725,36 +807,29 @@ h3 {
     size: A4 portrait;
     margin: 0;
   }
-  body * {
-    visibility: hidden;
-  }
-  .no-print {
-    display: none !important;
-  }
 
   .document-viewer {
-    position: absolute;
+    position: fixed;
     left: 0;
     top: 0;
     width: 210mm;
     height: 297mm;
-    padding: 0;
-    background: white;
-    overflow: visible;
-  }
-
-  .a4-paper,
-  .a4-paper * {
-    visibility: visible;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    z-index: 9999;
   }
 
   .a4-paper {
-    position: absolute;
-    left: 0;
-    top: 0;
-    box-shadow: none;
-    padding: 15mm 20mm;
-    width: 100%;
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 10mm 15mm;
+    width: 210mm;
+    height: 297mm;
+    min-height: 297mm;
+    max-height: 297mm;
+    overflow: hidden;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }

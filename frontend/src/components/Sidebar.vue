@@ -24,7 +24,7 @@ function handleLogout() {
   <aside class="sidebar" :class="{ collapsed }">
     <div class="logo">
       <i class="pi pi-microchip"></i>
-      <span v-if="!collapsed">Test Bench Report Generator</span>
+      <span v-if="!collapsed">ValveDAX</span>
     </div>
 
     <nav class="menu">

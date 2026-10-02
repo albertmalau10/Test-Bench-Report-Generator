@@ -1,101 +1,70 @@
 <template>
   <main class="login-page">
     <section class="login-shell">
-      <!-- System identity -->
+      <!-- Left Identity Panel -->
       <aside class="system-panel">
         <div class="system-brand">
-          <div class="logo-frame">
-            <img
-              :src="logo"
-              alt="Test Bench Report Generator"
-              class="brand-logo"
-            />
+          <div class="brand-badge">
+            <img :src="rexrothLogo" alt="Bosch Rexroth" class="brand-logo" />
           </div>
-
           <div class="brand-copy">
-            <span class="brand-label">APPLICATION</span>
-            <strong>Test Bench Report Generator</strong>
+            <span class="brand-label">PLATFORM</span>
+            <strong>ValveDAX</strong>
           </div>
         </div>
 
         <div class="system-content">
-          <p class="section-index">01 / ACCESS</p>
-
-          <h1>Engineering test data and report management.</h1>
-
+          <p class="section-index">01 / LOGIN PAGE</p>
+          <h1>Valve Data Acquisition</h1>
           <p class="system-description">
-            Authorized access for hydraulic valve testing, data recording,
-            and report generation.
+            Dedicated hydraulic valve data acquisition stand powered by Bosch Rexroth ctrlX CORE.
           </p>
 
           <dl class="system-information">
             <div class="information-row">
               <dt>System</dt>
-              <dd>Test Bench Platform</dd>
+              <dd>ctrlX CORE Bench</dd>
             </div>
-
             <div class="information-row">
-              <dt>Interface</dt>
-              <dd>Web Application</dd>
+              <dt>Protocol</dt>
+              <dd>OPC UA (TCP:4840)</dd>
             </div>
-
             <div class="information-row">
               <dt>Access</dt>
               <dd>
                 <span class="status-indicator"></span>
-                Restricted
+                Local Air-Gapped
               </dd>
             </div>
           </dl>
         </div>
 
         <div class="system-footer">
-          <span>Internal Engineering Tool</span>
-          <span>v1.0</span>
+          <span>Bosch Rexroth 2026</span>
+          <span>v1.0.0</span>
         </div>
       </aside>
 
-      <!-- Authentication form -->
+      <!-- Right Form Panel -->
       <section class="form-panel">
-        <div class="mobile-brand">
-          <div class="logo-frame mobile-logo">
-            <img
-              :src="logo"
-              alt="Test Bench Report Generator"
-              class="brand-logo"
-            />
-          </div>
-
-          <div class="brand-copy">
-            <span class="brand-label">APPLICATION</span>
-            <strong>Test Bench Report Generator</strong>
-          </div>
-        </div>
-
         <div class="login-form-container">
           <header class="form-header">
             <span class="form-code">AUTH / 01</span>
-            <h2>Sign in</h2>
-            <p>Enter your assigned account credentials.</p>
+            <h2>Sign In</h2>
+            <p>Enter assigned workshop operator credentials.</p>
           </header>
 
-          <form
-            class="login-form"
-            novalidate
-            @submit.prevent="handleLogin"
-          >
+          <form class="login-form" novalidate @submit.prevent="handleLogin">
             <div class="field">
               <label for="username">Username</label>
-
               <div class="control-wrapper">
                 <i class="pi pi-user control-icon"></i>
-
                 <InputText
                   id="username"
                   v-model.trim="username"
                   type="text"
                   autocomplete="username"
-                  placeholder="Enter username"
+                  placeholder="Enter username (e.g. operator)"
                   :disabled="isLoading"
                   :invalid="Boolean(fieldErrors.username)"
                   class="text-control"
@@ -103,21 +72,15 @@
                   @input="clearError('username')"
                 />
               </div>
-
-              <small
-                v-if="fieldErrors.username"
-                class="field-error"
-              >
+              <small v-if="fieldErrors.username" class="field-error">
                 {{ fieldErrors.username }}
               </small>
             </div>
 
             <div class="field">
               <label for="password">Password</label>
-
               <div class="control-wrapper">
                 <i class="pi pi-lock control-icon"></i>
-
                 <Password
                   v-model="password"
                   inputId="password"
@@ -132,22 +95,13 @@
                   @input="clearError('password')"
                 />
               </div>
-
-              <small
-                v-if="fieldErrors.password"
-                class="field-error"
-              >
+              <small v-if="fieldErrors.password" class="field-error">
                 {{ fieldErrors.password }}
               </small>
             </div>
 
-            <div
-              v-if="errorMessage"
-              class="authentication-error"
-              role="alert"
-            >
+            <div v-if="errorMessage" class="authentication-error" role="alert">
               <i class="pi pi-exclamation-triangle"></i>
-
               <div>
                 <strong>Authentication failed</strong>
                 <span>{{ errorMessage }}</span>
@@ -156,18 +110,21 @@
 
             <Button
               type="submit"
-              label="Continue"
+              label="Login"
               icon="pi pi-arrow-right"
-              iconPos="right"
+              iconPos="right" 
               :loading="isLoading"
               :disabled="isLoading"
               class="login-button"
             />
           </form>
 
+          <!-- Quick Operator Credentials Guide -->
           <footer class="form-footer">
-            <i class="pi pi-shield"></i>
-            <span>Authorized personnel only</span>
+            <div class="credential-pills">
+              <span class="cred-chip"><strong>Role:</strong> operator</span>
+              <span class="cred-chip"><strong>Admin:</strong> admin</span>
+            </div>
           </footer>
         </div>
       </section>
@@ -176,79 +133,73 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { useAuthStore } from '../stores/auth'
+import { reactive, ref } from "vue";
+import { useRouter } from "vue-router";
+import { useAuthStore } from "../stores/auth";
 
-import logo from '../assets/logo.jpg'
+import rexrothLogo from '../assets/Bosch_Rexroth-Logo.wine.svg'
 
-import InputText from 'primevue/inputtext'
-import Password from 'primevue/password'
-import Button from 'primevue/button'
+import InputText from "primevue/inputtext";
+import Password from "primevue/password";
+import Button from "primevue/button";
 
-const username = ref('')
-const password = ref('')
-const errorMessage = ref('')
-const isLoading = ref(false)
+const username = ref("");
+const password = ref("");
+const errorMessage = ref("");
+const isLoading = ref(false);
 
 const fieldErrors = reactive({
-  username: '',
-  password: ''
-})
+  username: "",
+  password: "",
+});
 
-const authStore = useAuthStore()
-const router = useRouter()
+const authStore = useAuthStore();
+const router = useRouter();
 
 function validateForm() {
-  fieldErrors.username = ''
-  fieldErrors.password = ''
-  errorMessage.value = ''
+  fieldErrors.username = "";
+  fieldErrors.password = "";
+  errorMessage.value = "";
 
   if (!username.value.trim()) {
-    fieldErrors.username = 'Username is required.'
+    fieldErrors.username = "Username is required.";
   }
 
   if (!password.value) {
-    fieldErrors.password = 'Password is required.'
+    fieldErrors.password = "Password is required.";
   }
 
-  return !fieldErrors.username && !fieldErrors.password
+  return !fieldErrors.username && !fieldErrors.password;
 }
 
 function clearError(fieldName) {
-  fieldErrors[fieldName] = ''
-  errorMessage.value = ''
+  fieldErrors[fieldName] = "";
+  errorMessage.value = "";
 }
 
 async function handleLogin() {
   if (!validateForm()) {
-    return
+    return;
   }
 
-  isLoading.value = true
-  errorMessage.value = ''
+  isLoading.value = true;
+  errorMessage.value = "";
 
   try {
-    await authStore.login(
-      username.value.trim(),
-      password.value
-    )
+    await authStore.login(username.value.trim(), password.value);
 
-    await router.push('/')
+    await router.push("/");
   } catch (err) {
     if (!err.response) {
-      errorMessage.value =
-        'Unable to connect to the backend server.'
+      errorMessage.value = "Unable to connect to the backend server.";
     } else if (err.response.status === 401) {
-      errorMessage.value =
-        'Incorrect username or password.'
+      errorMessage.value = "Incorrect username or password.";
     } else {
       errorMessage.value =
-        err.response?.data?.error ||
-        'An unexpected error occurred.'
+        err.response?.data?.error || "An unexpected error occurred.";
     }
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
 }
 </script>
@@ -263,29 +214,15 @@ async function handleLogin() {
   color: var(--text-color);
   background-color: var(--bg-color);
   background-image:
-    linear-gradient(
-      rgba(0, 43, 73, 0.05) 1px,
-      transparent 1px
-    ),
-    linear-gradient(
-      90deg,
-      rgba(0, 43, 73, 0.05) 1px,
-      transparent 1px
-    );
+    linear-gradient(rgba(0, 43, 73, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 43, 73, 0.05) 1px, transparent 1px);
   background-size: 32px 32px;
 }
 
 .p-dark .login-page {
   background-image:
-    linear-gradient(
-      rgba(255, 255, 255, 0.03) 1px,
-      transparent 1px
-    ),
-    linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.03) 1px,
-      transparent 1px
-    );
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
 }
 
 .login-shell {
@@ -313,7 +250,7 @@ async function handleLogin() {
 .system-brand {
   display: flex;
   align-items: center;
-  gap: 0.85rem;
+  gap: 0.9rem;
 }
 
 .logo-frame {
@@ -329,17 +266,40 @@ async function handleLogin() {
 }
 
 .brand-logo {
-  display: block;
-  width: 100%;
-  height: 100%;
+  height: 22px;
+  width: auto;
   object-fit: contain;
+  display: block;
+}
+
+.brand-badge {
+  background: #ffffff;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .brand-copy {
-  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.22rem;
+  gap: 0.15rem;
+}
+
+.brand-label {
+  color: var(--rexroth-casper);
+  font-family: Consolas, Monaco, monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.14em;
+}
+
+.brand-copy strong {
+  color: #ffffff;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .system-brand .brand-label {
@@ -495,6 +455,12 @@ async function handleLogin() {
   line-height: 1.6;
 }
 
+.form-footer {
+  margin-top: 1.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 1rem;
+}
+
 .login-form {
   display: flex;
   flex-direction: column;
@@ -511,6 +477,26 @@ async function handleLogin() {
   color: var(--text-color);
   font-size: 0.77rem;
   font-weight: 600;
+}
+
+.credential-pills {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.cred-chip {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px;
+  font-family: Consolas, Monaco, monospace;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.cred-chip strong {
+  color: var(--primary-color);
 }
 
 .control-wrapper {
@@ -548,7 +534,9 @@ async function handleLogin() {
   border-radius: 4px;
   font-size: 0.85rem;
   box-shadow: none;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
 }
 
 .control-wrapper :deep(.p-inputtext::placeholder),
@@ -639,7 +627,9 @@ async function handleLogin() {
   font-size: 0.82rem;
   font-weight: 700;
   box-shadow: none;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .login-button:not(:disabled):hover {

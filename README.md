@@ -1,4 +1,7 @@
-# 🚀 Valve Test Bench Report Generator
+# ValveDAX (VDAX)
+
+> **Valve Data Acquisition System**  
+> Industrial hydraulic valve test bench automation, real-time OPC UA telemetry logging, and certificate reporting powered by Bosch Rexroth ctrlX CORE.
 
 A web-based platform for **hydraulic valve testing**, **real-time telemetry monitoring**, and **automated PDF report generation**.
 

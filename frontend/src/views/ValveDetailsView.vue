@@ -81,17 +81,18 @@ const datasheetUrl = computed(() => {
 
 
 const formattedCommandRange = computed(() => {
-  if (!valve.value?.command_value) return "-"
-  const val = valve.value.command_value
+  if (valve.value?.command_value == null) return "-"
+  
+  const valStr = String(valve.value.command_value)
   const type = String(valve.value.command_type || "").toLowerCase()
 
   if (type.includes("current") || type.includes("ma")) {
-    return val.includes("mA") ? val : `${val} mA`
+    return valStr.includes("mA") ? valStr : `${valStr} mA`
   }
   if (type.includes("volt") || type.includes("v")) {
-    return val.includes("V") ? val : `${val} V`
+    return valStr.includes("V") ? valStr : `${valStr} V`
   }
-  return val
+  return valStr
 })
 
 onMounted(() => {

@@ -19,6 +19,7 @@ import { useToast } from 'primevue/usetoast'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import FileUpload from 'primevue/fileupload'
+import Dropdown from 'primevue/dropdown'
 
 const router = useRouter()
 const valveStore = useValveStore()
@@ -45,10 +46,17 @@ const emptyForm = {
   weight: null,
   rated_flow: null,
   max_flow: null,
-  command_value: null,
   command_type: 'Voltage (0-10V)',
   max_pressure: null
-}
+} 
+
+const commandTypeOptions = [
+  'Voltage (0-10V)',
+  'Voltage (±10V)',
+  'Current (4-20mA)',
+  'Current (0-20mA)',
+  'Current (0-1300mA)'
+] 
 
 const form = reactive({ ...emptyForm })
 const errors = reactive({})
@@ -288,26 +296,46 @@ onMounted(fetchValves)
           </div>
         </fieldset>
 
-        <!-- Col 2: Electrical & Documents -->
-        <fieldset class="form-section">
-          <legend>Electrical & Documents</legend>
-          <div class="field">
-            <label>Command Type</label>
-            <InputText v-model="form.command_type" placeholder="e.g. Voltage (0-10V) or Current (4-20mA)" />
-          </div>
-          <div class="field">
-            <label>Nominal Command Value</label>
-            <InputNumber v-model="form.command_value" :maxFractionDigits="2" />
-          </div>
-          <div v-if="authStore.isAdmin" class="field upload-field">
-            <label>Valve Image (PNG/JPG)</label>
-            <FileUpload mode="basic" accept="image/*" :maxFileSize="2000000" chooseLabel="Select Photo" :auto="false" customUpload @select="(e) => selectedFile = e.files[0]" />
-          </div>
-          <div v-if="authStore.isAdmin" class="field upload-field">
-            <label>Datasheet Document (PDF)</label>
-            <FileUpload mode="basic" accept="application/pdf" :maxFileSize="5000000" chooseLabel="Select PDF" :auto="false" customUpload @select="(e) => selectedDatasheetFile = e.files[0]" />
-          </div>
-        </fieldset>
+<!-- Col 2: Electrical & Documents -->
+<fieldset class="form-section">
+  <legend>Electrical & Documents</legend>
+  
+  <div class="field">
+    <label>Command Type</label>
+    <Dropdown
+      v-model="form.command_type"
+      :options="commandTypeOptions"
+      placeholder="Select Command Interface"
+      class="w-full"
+    />
+  </div>
+
+  <div v-if="authStore.isAdmin" class="field upload-field">
+    <label>Valve Image (PNG/JPG)</label>
+    <FileUpload
+      mode="basic"
+      accept="image/*"
+      :maxFileSize="2000000"
+      chooseLabel="Select Photo"
+      :auto="false"
+      customUpload
+      @select="(e) => selectedFile = e.files[0]"
+    />
+  </div>
+
+  <div v-if="authStore.isAdmin" class="field upload-field">
+    <label>Datasheet Document (PDF)</label>
+    <FileUpload
+      mode="basic"
+      accept="application/pdf"
+      :maxFileSize="5000000"
+      chooseLabel="Select PDF"
+      :auto="false"
+      customUpload
+      @select="(e) => selectedDatasheetFile = e.files[0]"
+    />
+  </div>
+</fieldset>
       </div>
 
       <template #footer>
@@ -425,4 +453,7 @@ onMounted(fetchValves)
 .upload-field {
   margin-top: 0.25rem;
 }
+.w-full {
+  width: 100%;
+} 
 </style>
