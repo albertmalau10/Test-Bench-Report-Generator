@@ -1,101 +1,70 @@
 <template>
   <main class="login-page">
     <section class="login-shell">
-      <!-- System identity -->
+      <!-- Left Identity Panel -->
       <aside class="system-panel">
         <div class="system-brand">
-          <div class="logo-frame">
-            <img
-              :src="logo"
-              alt="Test Bench Report Generator"
-              class="brand-logo"
-            />
+          <div class="brand-badge">
+            <img :src="rexrothLogo" alt="Bosch Rexroth" class="brand-logo" />
           </div>
-
           <div class="brand-copy">
-            <span class="brand-label">APPLICATION</span>
-            <strong>Test Bench Report Generator</strong>
+            <span class="brand-label">PLATFORM</span>
+            <strong>ValveDAX</strong>
           </div>
         </div>
 
         <div class="system-content">
-          <p class="section-index">01 / ACCESS</p>
-
-          <h1>Engineering test data and report management.</h1>
-
+          <p class="section-index">01 / LOGIN PAGE</p>
+          <h1>Valve Data Acquisition</h1>
           <p class="system-description">
-            Authorized access for hydraulic valve testing, data recording,
-            and report generation.
+            Dedicated hydraulic valve data acquisition stand powered by Bosch Rexroth ctrlX CORE.
           </p>
 
           <dl class="system-information">
             <div class="information-row">
               <dt>System</dt>
-              <dd>Test Bench Platform</dd>
+              <dd>ctrlX CORE Bench</dd>
             </div>
-
             <div class="information-row">
-              <dt>Interface</dt>
-              <dd>Web Application</dd>
+              <dt>Protocol</dt>
+              <dd>OPC UA (TCP:4840)</dd>
             </div>
-
             <div class="information-row">
               <dt>Access</dt>
               <dd>
                 <span class="status-indicator"></span>
-                Restricted
+                Local Air-Gapped
               </dd>
             </div>
           </dl>
         </div>
 
         <div class="system-footer">
-          <span>Internal Engineering Tool</span>
-          <span>v1.0</span>
+          <span>Bosch Rexroth 2026</span>
+          <span>v1.0.0</span>
         </div>
       </aside>
 
-      <!-- Authentication form -->
+      <!-- Right Form Panel -->
       <section class="form-panel">
-        <div class="mobile-brand">
-          <div class="logo-frame mobile-logo">
-            <img
-              :src="logo"
-              alt="Test Bench Report Generator"
-              class="brand-logo"
-            />
-          </div>
-
-          <div class="brand-copy">
-            <span class="brand-label">APPLICATION</span>
-            <strong>Test Bench Report Generator</strong>
-          </div>
-        </div>
-
         <div class="login-form-container">
           <header class="form-header">
             <span class="form-code">AUTH / 01</span>
-            <h2>Sign in</h2>
-            <p>Enter your assigned account credentials.</p>
+            <h2>Sign In</h2>
+            <p>Enter assigned workshop operator credentials.</p>
           </header>
 
-          <form
-            class="login-form"
-            novalidate
-            @submit.prevent="handleLogin"
-          >
+          <form class="login-form" novalidate @submit.prevent="handleLogin">
             <div class="field">
               <label for="username">Username</label>
-
               <div class="control-wrapper">
                 <i class="pi pi-user control-icon"></i>
-
                 <InputText
                   id="username"
                   v-model.trim="username"
                   type="text"
                   autocomplete="username"
-                  placeholder="Enter username"
+                  placeholder="Enter username (e.g. operator)"
                   :disabled="isLoading"
                   :invalid="Boolean(fieldErrors.username)"
                   class="text-control"
@@ -103,21 +72,15 @@
                   @input="clearError('username')"
                 />
               </div>
-
-              <small
-                v-if="fieldErrors.username"
-                class="field-error"
-              >
+              <small v-if="fieldErrors.username" class="field-error">
                 {{ fieldErrors.username }}
               </small>
             </div>
 
             <div class="field">
               <label for="password">Password</label>
-
               <div class="control-wrapper">
                 <i class="pi pi-lock control-icon"></i>
-
                 <Password
                   v-model="password"
                   inputId="password"
@@ -132,22 +95,13 @@
                   @input="clearError('password')"
                 />
               </div>
-
-              <small
-                v-if="fieldErrors.password"
-                class="field-error"
-              >
+              <small v-if="fieldErrors.password" class="field-error">
                 {{ fieldErrors.password }}
               </small>
             </div>
 
-            <div
-              v-if="errorMessage"
-              class="authentication-error"
-              role="alert"
-            >
+            <div v-if="errorMessage" class="authentication-error" role="alert">
               <i class="pi pi-exclamation-triangle"></i>
-
               <div>
                 <strong>Authentication failed</strong>
                 <span>{{ errorMessage }}</span>
@@ -156,18 +110,21 @@
 
             <Button
               type="submit"
-              label="Continue"
+              label="Login"
               icon="pi pi-arrow-right"
-              iconPos="right"
+              iconPos="right" 
               :loading="isLoading"
               :disabled="isLoading"
               class="login-button"
             />
           </form>
 
+          <!-- Quick Operator Credentials Guide -->
           <footer class="form-footer">
-            <i class="pi pi-shield"></i>
-            <span>Authorized personnel only</span>
+            <div class="credential-pills">
+              <span class="cred-chip"><strong>Role:</strong> operator</span>
+              <span class="cred-chip"><strong>Admin:</strong> admin</span>
+            </div>
           </footer>
         </div>
       </section>
@@ -176,79 +133,73 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { useAuthStore } from '../stores/auth'
+import { reactive, ref } from "vue";
+import { useRouter } from "vue-router";
+import { useAuthStore } from "../stores/auth";
 
-import logo from '../assets/logo.jpg'
+import rexrothLogo from '../assets/Bosch_Rexroth-Logo.wine.svg'
 
-import InputText from 'primevue/inputtext'
-import Password from 'primevue/password'
-import Button from 'primevue/button'
+import InputText from "primevue/inputtext";
+import Password from "primevue/password";
+import Button from "primevue/button";
 
-const username = ref('')
-const password = ref('')
-const errorMessage = ref('')
-const isLoading = ref(false)
+const username = ref("");
+const password = ref("");
+const errorMessage = ref("");
+const isLoading = ref(false);
 
 const fieldErrors = reactive({
-  username: '',
-  password: ''
-})
+  username: "",
+  password: "",
+});
 
-const authStore = useAuthStore()
-const router = useRouter()
+const authStore = useAuthStore();
+const router = useRouter();
 
 function validateForm() {
-  fieldErrors.username = ''
-  fieldErrors.password = ''
-  errorMessage.value = ''
+  fieldErrors.username = "";
+  fieldErrors.password = "";
+  errorMessage.value = "";
 
   if (!username.value.trim()) {
-    fieldErrors.username = 'Username is required.'
+    fieldErrors.username = "Username is required.";
   }
 
   if (!password.value) {
-    fieldErrors.password = 'Password is required.'
+    fieldErrors.password = "Password is required.";
   }
 
-  return !fieldErrors.username && !fieldErrors.password
+  return !fieldErrors.username && !fieldErrors.password;
 }
 
 function clearError(fieldName) {
-  fieldErrors[fieldName] = ''
-  errorMessage.value = ''
+  fieldErrors[fieldName] = "";
+  errorMessage.value = "";
 }
 
 async function handleLogin() {
   if (!validateForm()) {
-    return
+    return;
   }
 
-  isLoading.value = true
-  errorMessage.value = ''
+  isLoading.value = true;
+  errorMessage.value = "";
 
   try {
-    await authStore.login(
-      username.value.trim(),
-      password.value
-    )
+    await authStore.login(username.value.trim(), password.value);
 
-    await router.push('/')
+    await router.push("/");
   } catch (err) {
     if (!err.response) {
-      errorMessage.value =
-        'Unable to connect to the backend server.'
+      errorMessage.value = "Unable to connect to the backend server.";
     } else if (err.response.status === 401) {
-      errorMessage.value =
-        'Incorrect username or password.'
+      errorMessage.value = "Incorrect username or password.";
     } else {
       errorMessage.value =
-        err.response?.data?.error ||
-        'An unexpected error occurred.'
+        err.response?.data?.error || "An unexpected error occurred.";
     }
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
 }
 </script>
@@ -260,19 +211,18 @@ async function handleLogin() {
   display: grid;
   place-items: center;
   padding: 2rem;
-  color: #d9e0e7;
-  background-color: #101417;
+  color: var(--text-color);
+  background-color: var(--bg-color);
   background-image:
-    linear-gradient(
-      rgba(255, 255, 255, 0.018) 1px,
-      transparent 1px
-    ),
-    linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.018) 1px,
-      transparent 1px
-    );
+    linear-gradient(rgba(0, 43, 73, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 43, 73, 0.05) 1px, transparent 1px);
   background-size: 32px 32px;
+}
+
+.p-dark .login-page {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
 }
 
 .login-shell {
@@ -281,27 +231,26 @@ async function handleLogin() {
   display: grid;
   grid-template-columns: 42% 58%;
   overflow: hidden;
-  background: #171c20;
-  border: 1px solid #30383e;
-  border-radius: 4px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.32);
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
 }
 
 /* Left system panel */
-
 .system-panel {
   min-width: 0;
   display: flex;
   flex-direction: column;
   padding: 2.25rem;
-  background: #1c2226;
-  border-right: 1px solid #30383e;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border-color);
 }
 
 .system-brand {
   display: flex;
   align-items: center;
-  gap: 0.85rem;
+  gap: 0.9rem;
 }
 
 .logo-frame {
@@ -312,33 +261,70 @@ async function handleLogin() {
   place-items: center;
   overflow: hidden;
   background: #ffffff;
-  border: 1px solid #394149;
-  border-radius: 3px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
 }
 
 .brand-logo {
-  display: block;
-  width: 100%;
-  height: 100%;
+  height: 22px;
+  width: auto;
   object-fit: contain;
+  display: block;
+}
+
+.brand-badge {
+  background: #ffffff;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .brand-copy {
-  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.22rem;
+  gap: 0.15rem;
 }
 
 .brand-label {
-  color: #71808b;
+  color: var(--rexroth-casper);
+  font-family: Consolas, Monaco, monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.14em;
+}
+
+.brand-copy strong {
+  color: #ffffff;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.system-brand .brand-label {
+  color: var(--text-muted);
   font-family: Consolas, Monaco, monospace;
   font-size: 0.62rem;
   letter-spacing: 0.16em;
 }
 
-.brand-copy strong {
-  color: #edf1f4;
+.system-brand .brand-copy strong {
+  color: #ffffff;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.mobile-brand .brand-label {
+  color: var(--text-muted);
+  font-family: Consolas, Monaco, monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+}
+
+.mobile-brand .brand-copy strong {
+  color: var(--text-color);
   font-size: 0.88rem;
   font-weight: 600;
   line-height: 1.35;
@@ -349,10 +335,9 @@ async function handleLogin() {
   padding: 3rem 0;
 }
 
-.section-index,
-.form-code {
+.section-index {
   margin: 0 0 1rem;
-  color: #39cf92;
+  color: var(--info-color);
   font-family: Consolas, Monaco, monospace;
   font-size: 0.68rem;
   font-weight: 600;
@@ -362,7 +347,7 @@ async function handleLogin() {
 .system-content h1 {
   max-width: 22rem;
   margin: 0;
-  color: #f0f3f5;
+  color: #ffffff;
   font-size: clamp(2rem, 3.2vw, 2.8rem);
   font-weight: 600;
   line-height: 1.12;
@@ -372,14 +357,14 @@ async function handleLogin() {
 .system-description {
   max-width: 21rem;
   margin: 1.25rem 0 0;
-  color: #8c9aa4;
+  color: var(--rexroth-casper);
   font-size: 0.86rem;
   line-height: 1.75;
 }
 
 .system-information {
   margin: 2.6rem 0 0;
-  border-top: 1px solid #30383e;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .information-row {
@@ -387,11 +372,11 @@ async function handleLogin() {
   grid-template-columns: 6rem 1fr;
   min-height: 2.7rem;
   align-items: center;
-  border-bottom: 1px solid #30383e;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .information-row dt {
-  color: #687781;
+  color: var(--rexroth-casper);
   font-family: Consolas, Monaco, monospace;
   font-size: 0.68rem;
   letter-spacing: 0.05em;
@@ -403,35 +388,34 @@ async function handleLogin() {
   display: flex;
   align-items: center;
   gap: 0.48rem;
-  color: #b9c3ca;
+  color: #ffffff;
   font-size: 0.78rem;
 }
 
 .status-indicator {
   width: 7px;
   height: 7px;
-  background: #39cf92;
+  background: var(--info-color);
   border-radius: 50%;
 }
 
 .system-footer {
   display: flex;
   justify-content: space-between;
-  color: #5f6c75;
+  color: var(--rexroth-casper);
   font-family: Consolas, Monaco, monospace;
   font-size: 0.65rem;
   letter-spacing: 0.04em;
 }
 
 /* Right form panel */
-
 .form-panel {
   min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 3.5rem;
-  background: #171c20;
+  background: var(--card-bg);
 }
 
 .mobile-brand {
@@ -448,12 +432,17 @@ async function handleLogin() {
 }
 
 .form-code {
-  margin-bottom: 0.85rem;
+  margin: 0 0 0.85rem;
+  color: var(--info-color);
+  font-family: Consolas, Monaco, monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.13em;
 }
 
 .form-header h2 {
   margin: 0 0 0.5rem;
-  color: #f0f3f5;
+  color: var(--text-color);
   font-size: 1.75rem;
   font-weight: 600;
   letter-spacing: -0.025em;
@@ -461,9 +450,15 @@ async function handleLogin() {
 
 .form-header p {
   margin: 0;
-  color: #7d8b95;
+  color: var(--text-muted);
   font-size: 0.84rem;
   line-height: 1.6;
+}
+
+.form-footer {
+  margin-top: 1.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 1rem;
 }
 
 .login-form {
@@ -479,9 +474,29 @@ async function handleLogin() {
 }
 
 .field label {
-  color: #b8c2c9;
+  color: var(--text-color);
   font-size: 0.77rem;
   font-weight: 600;
+}
+
+.credential-pills {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.cred-chip {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px;
+  font-family: Consolas, Monaco, monospace;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.cred-chip strong {
+  color: var(--primary-color);
 }
 
 .control-wrapper {
@@ -494,14 +509,14 @@ async function handleLogin() {
   z-index: 2;
   top: 50%;
   left: 0.95rem;
-  color: #65737d;
+  color: var(--text-muted);
   font-size: 0.86rem;
   pointer-events: none;
   transform: translateY(-50%);
 }
 
 .control-wrapper:focus-within .control-icon {
-  color: #39cf92;
+  color: var(--primary-color);
 }
 
 .text-control {
@@ -513,10 +528,10 @@ async function handleLogin() {
   width: 100%;
   height: 46px;
   padding-left: 2.65rem;
-  color: #e0e6ea;
-  background: #111518;
-  border: 1px solid #354047;
-  border-radius: 3px;
+  color: var(--text-color);
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
   font-size: 0.85rem;
   box-shadow: none;
   transition:
@@ -526,23 +541,22 @@ async function handleLogin() {
 
 .control-wrapper :deep(.p-inputtext::placeholder),
 .control-wrapper :deep(.password-input::placeholder) {
-  color: #55626b;
+  color: var(--text-muted);
 }
 
 .control-wrapper :deep(.p-inputtext:hover),
 .control-wrapper :deep(.password-input:hover) {
-  border-color: #4b5962;
+  border-color: var(--primary-color);
 }
 
 .control-wrapper :deep(.p-inputtext:focus),
 .control-wrapper :deep(.password-input:focus) {
-  background: #13181b;
-  border-color: #39cf92;
-  box-shadow: 0 0 0 2px rgba(57, 207, 146, 0.08);
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(0, 204, 255, 0.2);
 }
 
 .control-wrapper :deep(.p-invalid) {
-  border-color: #df6d6d;
+  border-color: var(--danger-color);
 }
 
 .password-control {
@@ -558,11 +572,11 @@ async function handleLogin() {
 }
 
 .password-control :deep(.p-password-toggle-mask-icon) {
-  color: #65737d;
+  color: var(--text-muted);
 }
 
 .field-error {
-  color: #e58a8a;
+  color: var(--danger-color);
   font-size: 0.7rem;
 }
 
@@ -571,15 +585,15 @@ async function handleLogin() {
   align-items: flex-start;
   gap: 0.7rem;
   padding: 0.85rem;
-  color: #e9a1a1;
-  background: #261b1c;
-  border-left: 3px solid #cf6464;
+  color: #ff8080;
+  background: rgba(223, 0, 36, 0.1);
+  border-left: 3px solid var(--danger-color);
   border-radius: 2px;
 }
 
 .authentication-error > i {
   margin-top: 0.12rem;
-  color: #cf6464;
+  color: var(--danger-color);
   font-size: 0.85rem;
 }
 
@@ -590,13 +604,12 @@ async function handleLogin() {
 }
 
 .authentication-error strong {
-  color: #e9b1b1;
+  color: var(--danger-color);
   font-size: 0.75rem;
   font-weight: 600;
 }
 
 .authentication-error span {
-  color: #b98585;
   font-size: 0.7rem;
   line-height: 1.45;
 }
@@ -607,10 +620,10 @@ async function handleLogin() {
   margin-top: 0.2rem;
   display: flex;
   justify-content: space-between;
-  color: #07120d;
-  background: #39cf92;
-  border: 1px solid #39cf92;
-  border-radius: 3px;
+  color: #001524;
+  background: var(--info-color);
+  border: 1px solid var(--info-color);
+  border-radius: 4px;
   font-size: 0.82rem;
   font-weight: 700;
   box-shadow: none;
@@ -620,13 +633,8 @@ async function handleLogin() {
 }
 
 .login-button:not(:disabled):hover {
-  background: #47dda0;
-  border-color: #47dda0;
-}
-
-.login-button:not(:disabled):active {
-  background: #31ba83;
-  border-color: #31ba83;
+  background: #33d6ff;
+  border-color: #33d6ff;
 }
 
 .form-footer {
@@ -634,16 +642,14 @@ async function handleLogin() {
   align-items: center;
   gap: 0.45rem;
   margin-top: 1.5rem;
-  color: #59666f;
+  color: var(--text-muted);
   font-size: 0.68rem;
 }
 
 .form-footer i {
-  color: #65737d;
+  color: var(--text-muted);
   font-size: 0.72rem;
 }
-
-/* Responsive */
 
 @media (max-width: 760px) {
   .login-page {

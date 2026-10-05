@@ -16,7 +16,7 @@ import (
 
 func main() {
 	if err := godotenv.Load(); err != nil {
-		log.Println("Warning: .env tidak ditemukan, pakai default")
+		log.Println("Notice: .env file not found, using system environment defaults")
 	}
 
 	appPort := os.Getenv("APP_PORT")
@@ -26,55 +26,62 @@ func main() {
 
 	db := database.ConnectDB()
 	database.SeedUsers(db)
-	
+
 	sqlDB, err := db.DB()
 	if err != nil {
-		log.Fatal("gagal mengambil koneksi sql:", err)
+		log.Fatal("Failed to obtain SQL DB handle:", err)
 	}
 	defer sqlDB.Close()
 
+	_ = os.MkdirAll("./images", os.ModePerm)
+	_ = os.MkdirAll("./datasheets", os.ModePerm)
+
 	router := gin.Default()
 
-
+	// CORS configuration for local dev and local network access
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173"},
+		AllowOrigins:     []string{"http://localhost:5173", "http://127.0.0.1:5173"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
 
+	// Static asset routing
 	router.Static("/images", "./images")
 	router.Static("/datasheets", "./datasheets")
 
-	router.GET("/ping", controllers.Ping)
-	router.POST("/login", controllers.Login(db))
+	api := router.Group("/api")
+	{
+		// Health & Auth
+		api.GET("/ping", controllers.Ping)
+		api.POST("/login", controllers.Login(db))
 
-	router.GET("/valves", controllers.GetValves(db))
-	router.GET("/valves/:id", controllers.GetValveByID(db))
+		// Valve Master Data
+		api.GET("/valves", controllers.GetValves(db))
+		api.GET("/valves/:id", controllers.GetValveByID(db))
+		api.PUT("/valves/:id", middleware.AuthRequired(), controllers.UpdateValve(db))
+		api.POST("/valves", middleware.AuthRequired(), middleware.AdminOnly(), controllers.CreateValve(db))
+		api.DELETE("/valves/:id", middleware.AuthRequired(), middleware.AdminOnly(), controllers.DeleteValve(db))
+		api.POST("/valves/:id/image", middleware.AuthRequired(), middleware.AdminOnly(), controllers.UploadValveImage(db))
+		api.POST("/valves/:id/datasheet", middleware.AuthRequired(), middleware.AdminOnly(), controllers.UploadValveDatasheet(db))
 
-	router.PUT("/valves/:id", middleware.AuthRequired(), controllers.UpdateValve(db))
+		// Test Records & Telemetry Logs
+		api.GET("/records", middleware.AuthRequired(), controllers.GetTestRecords(db))
+		api.POST("/records", middleware.AuthRequired(), controllers.SaveTestRecord(db))
 
-	router.POST("/valves", middleware.AuthRequired(), middleware.AdminOnly(), controllers.CreateValve(db))
-	router.DELETE("/valves/:id", middleware.AuthRequired(), middleware.AdminOnly(), controllers.DeleteValve(db))
-	router.POST("/valves/:id/image", middleware.AuthRequired(), middleware.AdminOnly(), controllers.UploadValveImage(db))
-	router.POST("/valves/:id/datasheet", middleware.AuthRequired(), middleware.AdminOnly(), controllers.UploadValveDatasheet(db))
+		// System Settings
+		api.GET("/settings", middleware.AuthRequired(), middleware.AdminOnly(), controllers.GetSettings(db))
+		api.PUT("/settings", middleware.AuthRequired(), middleware.AdminOnly(), controllers.UpdateSettings(db))
 
-	router.GET("/settings", middleware.AuthRequired(), middleware.AdminOnly(), controllers.GetSettings(db))
-    router.PUT("/settings", middleware.AuthRequired(), middleware.AdminOnly(), controllers.UpdateSettings(db))
-    router.POST("/settings/ctrlx/token", middleware.AuthRequired(), middleware.AdminOnly(), controllers.GenerateCtrlxToken(db))
+		// OPC UA Telemetry & Actuation
+		api.GET("/opcua/data", middleware.AuthRequired(), controllers.GetOpcData(db))
+		api.GET("/opcua/status", middleware.AuthRequired(), controllers.GetOpcStatus(db))
+		api.POST("/ctrlx/start", middleware.AuthRequired(), controllers.StartOutput(db))
+		api.POST("/ctrlx/stop", middleware.AuthRequired(), controllers.StopOutput(db))
+	}
 
-	router.POST(
-				"/ctrlx/start",
-				middleware.AuthRequired(),
-				controllers.StartOutput(db),
-    )
-
-	router.POST(
-				"/ctrlx/stop",
-				middleware.AuthRequired(),
-				controllers.StopOutput(db),
-	)
-
-	router.Run(":" + appPort)
+	if err := router.Run(":" + appPort); err != nil {
+		log.Fatalf("Server startup failed: %v", err)
+	}
 }

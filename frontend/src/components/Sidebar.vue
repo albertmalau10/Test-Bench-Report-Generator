@@ -1,22 +1,22 @@
 <script setup>
-import { ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useTheme } from '../composables/useTheme'
-import { useAuthStore } from '../stores/auth'
+import { ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { useTheme } from "../composables/useTheme";
+import { useAuthStore } from "../stores/auth";
 
-const { isDark, toggleTheme } = useTheme()
+const { isDark, toggleTheme } = useTheme();
 
 defineProps({
-  collapsed: { type: Boolean, default: false }
-})
+  collapsed: { type: Boolean, default: false },
+});
 
-const route = useRoute()
-const router = useRouter()
-const authStore = useAuthStore()
+const route = useRoute();
+const router = useRouter();
+const authStore = useAuthStore();
 
 function handleLogout() {
-  authStore.logout()
-  router.push({ name: 'login' })
+  authStore.logout();
+  router.push({ name: "login" });
 }
 </script>
 
@@ -24,7 +24,7 @@ function handleLogout() {
   <aside class="sidebar" :class="{ collapsed }">
     <div class="logo">
       <i class="pi pi-microchip"></i>
-      <span v-if="!collapsed">Test Bench Report Generator</span>
+      <span v-if="!collapsed">ValveDAX</span>
     </div>
 
     <nav class="menu">
@@ -41,8 +41,11 @@ function handleLogout() {
       <router-link
         :to="{ name: 'valve-details-search' }"
         class="menu-item"
-        :class="{ active: route.name === 'valve-details-search' || route.name === 'valve-details' }"
-      >
+        :class="{
+          active:
+            route.name === 'valve-details-search' ||
+            route.name === 'valve-details',
+        }">
         <i class="pi pi-info-circle"></i>
         <span v-if="!collapsed">Valve Details</span>
       </router-link>
@@ -52,7 +55,16 @@ function handleLogout() {
         <span v-if="!collapsed">Records</span>
       </router-link>
 
-      <router-link to="/settings" class="menu-item" active-class="active" v-if="authStore.user?.role === 'admin'">
+      <router-link to="/report" class="menu-item" active-class="active">
+        <i class="pi pi-file-pdf"></i>
+        <span v-if="!collapsed">Generate Report</span>
+      </router-link>
+
+      <router-link
+        to="/settings"
+        class="menu-item"
+        active-class="active"
+        v-if="authStore.user?.role === 'admin'">
         <i class="pi pi-cog"></i>
         <span v-if="!collapsed">Settings</span>
       </router-link>
@@ -61,7 +73,7 @@ function handleLogout() {
     <div class="sidebar-footer">
       <button class="menu-item" @click="toggleTheme">
         <i :class="isDark ? 'pi pi-sun' : 'pi pi-moon'"></i>
-        <span v-if="!collapsed">{{ isDark ? 'Light Mode' : 'Dark Mode' }}</span>
+        <span v-if="!collapsed">{{ isDark ? "Light Mode" : "Dark Mode" }}</span>
       </button>
       <button class="menu-item" @click="handleLogout">
         <i class="pi pi-sign-out"></i>
@@ -97,7 +109,7 @@ function handleLogout() {
   padding: 0 1rem;
   font-weight: 700;
   font-size: 1.1rem;
-  color: var(--text-color);
+  color: var(--sidebar-text-active);
   border-bottom: 1px solid var(--border-color);
 }
 .menu {

@@ -1,37 +1,126 @@
-# Test Bench App
+# ValveDAX (VDAX)
 
-Web-based application for generating, managing, and exporting valve test bench reports.
+> **Valve Data Acquisition System**  
+> Industrial hydraulic valve test bench automation, real-time OPC UA telemetry logging, and certificate reporting powered by Bosch Rexroth ctrlX CORE.
 
-## Features
+A web-based platform for **hydraulic valve testing**, **real-time telemetry monitoring**, and **automated PDF report generation**.
 
-- User authentication
-- Valve master data management
-- Test report generation
-- Datasheet management
-- Image management
-- System settings configuration
+Built for industrial test bench environments with native **OPC UA** integration, enabling seamless communication with controllers such as **Bosch Rexroth ctrlX CORE**.
 
-## Technology Stack
+---
+
+## ✨ Features
+
+### 🔐 Authentication & Authorization
+- JWT-based authentication
+- Admin & Operator roles
+- Protected API endpoints
+
+### 🗄️ Valve Management
+- Manage valve master data
+- Upload valve images and datasheets
+- Maintain a centralized valve database
+
+### 🔌 OPC UA Integration
+- Connect to OPC UA servers
+- Configurable authentication & security policies
+- Live connection status monitoring
+
+### 📈 Real-Time Monitoring
+- Live pressure monitoring
+- Live flow monitoring
+- Command & feedback tracking
+- Interactive telemetry charts
+
+### 🧪 Test Recording
+- Record valve test sessions
+- Store telemetry history
+- Review historical test results
+
+### 📄 PDF Report Generation
+Generate professional valve test reports containing:
+
+- Valve specifications
+- Test metadata
+- Telemetry charts
+- Test results
+- Operator approval section
+
+---
+
+## 🏗️ Architecture
+
+```text
+┌─────────────────┐
+│   Vue 3 Client  │
+└────────┬────────┘
+         │ REST API
+         ▼
+┌─────────────────┐
+│  Go Gin Server  │
+└───────┬─────────┘
+        │
+   ┌────┴────┐
+   ▼         ▼
+ SQLite    OPC UA
+Database   Server
+```
+
+---
+
+## 🛠️ Tech Stack
 
 ### Backend
 - Go
-- Gin Framework
+- Gin
 - GORM
 - SQLite
+- JWT
+- OPC UA Client
 
 ### Frontend
-- Vue.js
+- Vue 3
 - Vite
-- JavaScript
+- PrimeVue
+- Pinia
+- Axios
+- Chart.js
 
-## Project Structure
+---
+
+## 📁 Project Structure
 
 ```text
-backend/
-frontend/
+.
+├── backend/
+│   ├── controllers/
+│   ├── database/
+│   ├── middleware/
+│   ├── models/
+│   ├── utils/
+│   ├── images/
+│   ├── datasheets/
+│   └── main.go
+│
+├── frontend/
+│   ├── public/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── layouts/
+│   │   ├── router/
+│   │   ├── services/
+│   │   ├── stores/
+│   │   └── views/
+│   └── package.json
+│
+└── README.md
 ```
 
-## Backend Setup
+---
+
+## ⚙️ Quick Start
+
+### 1. Backend
 
 ```bash
 cd backend
@@ -41,7 +130,13 @@ go mod download
 go run main.go
 ```
 
-## Frontend Setup
+Backend runs at:
+
+```text
+http://localhost:8080
+```
+
+### 2. Frontend
 
 ```bash
 cd frontend
@@ -51,30 +146,81 @@ npm install
 npm run dev
 ```
 
-## Environment Variables
-
-Create file:
+Frontend runs at:
 
 ```text
-backend/.env
+http://localhost:5173
 ```
 
-Example:
+---
+
+## 🔧 Environment Variables
+
+Create a `.env` file inside the `backend` directory:
 
 ```env
-PORT=8080
+APP_PORT=8080
+
+DB_PATH=./data.db
+
+JWT_SECRET=your-secret-key
+
+ADMIN_PASSWORD=adminpassword
+OPERATOR_PASSWORD=operatorpassword
 ```
 
-Update the values according to your environment.
+---
 
-## Database
+## 📂 File Storage
 
-This application uses SQLite.
+Uploaded assets are stored in:
 
-Database tables are created automatically through GORM AutoMigrate when the application starts.
+```text
+backend/images/
+backend/datasheets/
+```
 
-## Notes
+---
 
-- `.env` is not included in the repository.
-- SQLite database file is not included in the repository.
-- Frontend dependencies are installed using `npm install`.
+## 🔒 Security
+
+- JWT authentication
+- Role-based authorization
+- Upload validation
+- Configurable OPC UA security settings
+
+---
+
+## 📋 Typical Workflow
+
+```text
+Login
+  ↓
+Select Valve
+  ↓
+Connect to OPC UA
+  ↓
+Run Test
+  ↓
+Monitor Telemetry
+  ↓
+Save Test Record
+  ↓
+Generate PDF Report
+```
+
+---
+
+## 🎯 Main Use Cases
+
+- Hydraulic valve testing
+- Factory Acceptance Test (FAT)
+- Repair & maintenance verification
+- Quality assurance documentation
+- Engineering test report generation
+
+---
+
+## 📜 License
+
+created by Ahmadzakir Hanif (DCEA/SVC4-AS)

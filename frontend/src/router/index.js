@@ -8,6 +8,7 @@ import RecordsView from '../views/RecordsView.vue'
 import SettingView from '../views/SettingView.vue'
 import LoginView from '../views/LoginView.vue'
 import { useAuthStore } from '../stores/auth'
+import GenerateReport from '../views/GenerateReport.vue'
 
 
 
@@ -16,12 +17,6 @@ const routes = [
     path: '/login',
     name: 'login',
     component: LoginView
-  },
-  {
-  path: '/setting',
-  name: 'setting',
-  component: () => import('../views/SettingView.vue'),
-  meta: { requiresAuth: true, requiresAdmin: true }
   },
   {
     path: '/',
@@ -33,13 +28,14 @@ const routes = [
       { path: 'valves/details', name: 'valve-details-search', component: ValveDetailsView },
       { path: 'valves/:id', name: 'valve-details', component: ValveDetailsView },
       { path: 'records', name: 'records', component: RecordsView },
-      { path: 'settings', name: 'settings', component: SettingView },
+      { path: 'settings', name: 'settings', component: SettingView, meta: { requiresAdmin: true } },
+      { path: 'report', name: 'generate-report', component: GenerateReport },
     ]
   }
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes
 })
 
@@ -49,7 +45,9 @@ router.beforeEach((to, from, next) => {
   if (to.meta.requiresAuth && !authStore.isLoggedIn) {
     next({ name: 'login' })
   } else if (to.name === 'login' && authStore.isLoggedIn) {
-    next({ name: 'dashboard' }) // sudah login, tidak perlu ke halaman login lagi
+    next({ name: 'dashboard' })
+  } else if (to.meta.requiresAdmin && !authStore.isAdmin) {
+    next({ name: 'dashboard' }) 
   } else {
     next()
   }

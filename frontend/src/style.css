@@ -1,17 +1,64 @@
+/* ============================================================
+   Valve Database App — Bosch Rexroth Theme
+   ============================================================ */
 :root {
-  --bg-color: #f1f5f9;
-  --sidebar-bg: #ffffff;
-  --sidebar-text: #475569;
-  --sidebar-text-active: #2563eb;
-  --sidebar-active-bg: #eff6ff;
-  --topbar-bg: #ffffff;
-  --card-bg: #ffffff;
-  --text-color: #1e293b;
-  --text-muted: #64748b;
-  --border-color: #e2e8f0;
-  --primary-color: #2563eb;
+  /* --- Bosch Rexroth Core Palette --- */
+  --rexroth-prussian-blue: #002B49;
+  --rexroth-monza-red: #DF0024;
+  --rexroth-cyan: #00CCFF;
+  --rexroth-smalt-blue: #43545f;
+  --rexroth-casper: #A3BAC8;
+
+  /* ==========================================================
+     LIGHT THEME (Default)
+     ========================================================== */
+  --bg-color: #8a9297; /* Very light cool gray/blue for app background */
+  --card-bg: #BBBEC0; /* Clean white cards */
+  
+  --text-color: var(--rexroth-prussian-blue); /* Dark blue text for high readability */
+  --text-muted: var(--rexroth-smalt-blue);
+  --border-color: var(--rexroth-casper);
+  
+  /* Navigation (Sidebar & Topbar) */
+  --sidebar-bg: var(--rexroth-prussian-blue); 
+  --sidebar-text: var(--rexroth-casper);
+  --sidebar-text-active: #FFFFFF;
+  --sidebar-active-bg: var(--rexroth-smalt-blue);
+  --topbar-bg: var(--rexroth-prussian-blue);
+
+  /* Accents & Status */
+  --primary-color: var(--rexroth-prussian-blue);
+  --danger-color: var(--rexroth-monza-red);
+  --info-color: var(--rexroth-cyan);
 }
 
+.p-dark {
+  /* ==========================================================
+     DARK THEME (Adjusted to Bosch Rexroth Palette)
+     ========================================================== */
+  --bg-color: #001524; /* Deepened Prussian blue for outer background */
+  --card-bg: #002038; /* Slightly lighter Prussian blue for cards */
+  
+  --text-color: #F4F7F9; /* Off-white text */
+  --text-muted: var(--rexroth-casper); /* Casper blue for muted text */
+  --border-color: var(--rexroth-smalt-blue);
+  
+  /* Navigation (Sidebar & Topbar) */
+  --sidebar-bg: #001B2E; /* Blends into dark background */
+  --sidebar-text: var(--rexroth-casper);
+  --sidebar-text-active: var(--rexroth-cyan); /* Cyan pops beautifully on dark blue */
+  --sidebar-active-bg: var(--rexroth-prussian-blue);
+  --topbar-bg: #001B2E;
+
+  /* Accents & Status */
+  --primary-color: var(--rexroth-cyan);
+  --danger-color: var(--rexroth-monza-red);
+  --info-color: var(--rexroth-cyan);
+}
+
+/* ============================================================
+   Base Element Resets
+   ============================================================ */
 * {
   box-sizing: border-box;
 }
@@ -22,20 +69,7 @@ body {
   font-family: 'Segoe UI', Arial, sans-serif;
   background-color: var(--bg-color);
   color: var(--text-color);
-}
-
-.p-dark {
-  --bg-color: #0f172a;
-  --sidebar-bg: #1e293b;
-  --sidebar-text: #cbd5e1;
-  --sidebar-text-active: #60a5fa;
-  --sidebar-active-bg: #334155;
-  --topbar-bg: #1e293b;
-  --card-bg: #1e293b;
-  --text-color: #f1f5f9;
-  --text-muted: #94a3b8;
-  --border-color: #334155;
-  --primary-color: #60a5fa;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 html, body, #app {
@@ -48,4 +82,37 @@ html, body, #app {
   width: 28px;
   height: 28px;
   object-fit: contain;
+}
+
+/* Smooth transitions for theme switching on main structural classes */
+.card, .dashboard-card, .kpi-card, .settings-card, .panel, .search-toolbar {
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+/* ============================================================
+   Global Print Media Isolation
+   ============================================================ */
+@media print {
+  /* Hide application shell UI */
+  .topbar,
+  .sidebar,
+  .no-print {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Reset outer layout wrappers to prevent overflow clipping */
+  html,
+  body,
+  #app,
+  .main-layout,
+  .content-area,
+  .page-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    background: transparent !important;
+  }
 }
